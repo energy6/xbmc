@@ -40,7 +40,8 @@ CGUIWindowPVRTimers::CGUIWindowPVRTimers(CGUIWindowPVR *parent) :
 
 CGUIWindowPVRTimers::~CGUIWindowPVRTimers(void)
 {
-  if (g_PVRTimers) g_PVRTimers->UnregisterObserver(this);
+  if(g_PVRTimers)
+    g_PVRTimers->UnregisterObserver(this);
 }
 
 void CGUIWindowPVRTimers::ResetObservers(void)
