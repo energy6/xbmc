@@ -126,7 +126,6 @@ void CPVRManager::Stop(void)
   }
 
   /* stop all update threads */
-  lock.Enter();
   StopUpdateThreads();
 
   const CStdString wakeupcmd = g_guiSettings.GetString("pvrpowermanagement.setwakeupcmd", false);
@@ -144,6 +143,7 @@ void CPVRManager::Stop(void)
   }
 
   /* unload all data */
+  lock.Enter();
   g_EpgContainer.UnregisterObserver(this);
 
   m_recordings->Unload();
