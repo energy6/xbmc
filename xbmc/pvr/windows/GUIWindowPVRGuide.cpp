@@ -46,8 +46,9 @@ CGUIWindowPVRGuide::CGUIWindowPVRGuide(CGUIWindowPVR *parent) :
 {
 }
 
-CGUIWindowPVRGuide::~CGUIWindowPVRGuide(void)
+void CGUIWindowPVRGuide::UnregisterObservers(void)
 {
+  CSingleLock lock(m_critSection);
   g_EpgContainer.UnregisterObserver(this);
 }
 
@@ -397,7 +398,7 @@ bool CGUIWindowPVRGuide::PlayEpgItem(CFileItem *item)
   if (!channel)
     return false;
 
-  CLog::Log(LOG_DEBUG, "play channel '%s'", channel->ChannelName().c_str());
+  CLog::Log(LOGDEBUG, "play channel '%s'", channel->ChannelName().c_str());
   bool bReturn = g_application.PlayFile(CFileItem(*channel));
   if (!bReturn)
     CGUIDialogOK::ShowAndGetInput(19033,0,19035,0);

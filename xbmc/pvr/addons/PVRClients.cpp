@@ -1069,8 +1069,6 @@ void CPVRClients::StartChannelScan(void)
 
 int CPVRClients::AddClientToDb(const AddonPtr client)
 {
-  //CSingleLock lock(m_critSection); //FIXME: why is this a critical region?
-
   /* add this client to the database if it's not in there yet */
   CPVRDatabase *database = OpenPVRDatabase();
   int iClientDbId = database ? database->AddClient(client->Name(), client->ID()) : -1;
@@ -1107,7 +1105,6 @@ bool CPVRClients::InitialiseClient(AddonPtr client)
   if (!client->Enabled())
     return bReturn;
 
-  // CSingleLock lock(m_critSection); //FIXME: why is this a critical section?
   CLog::Log(LOGDEBUG, "%s - initialising add-on '%s'", __FUNCTION__, client->Name().c_str());
 
   /* register this client in the db */
@@ -1137,7 +1134,6 @@ bool CPVRClients::InitialiseClient(AddonPtr client)
 bool CPVRClients::UpdateAndInitialiseClients(bool bInitialiseAllClients /* = false */)
 {
   bool bReturn(false);
-  //CSingleLock lock(m_critSection); //FIXME: why is this a critical section?
 
   /* make sure that the callback is registered */
   CAddonMgr::Get().RegisterAddonMgrCallback(ADDON_PVRDLL, this);
