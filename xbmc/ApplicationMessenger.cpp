@@ -323,15 +323,15 @@ void CApplicationMessenger::ProcessMessage(ThreadMessage *pMsg)
               }
             }
 
+            g_playlistPlayer.ClearPlaylist(playlist);
+            g_playlistPlayer.SetCurrentPlaylist(playlist);
             //For single item lists try PlayMedia. This covers some more cases where a playlist is not appropriate
             //It will fall through to PlayFile
             if (list->Size() == 1 && !(*list)[0]->IsPlayList())
               g_application.PlayMedia(*((*list)[0]), playlist);
             else
             {
-              g_playlistPlayer.ClearPlaylist(playlist);
               g_playlistPlayer.Add(playlist, (*list));
-              g_playlistPlayer.SetCurrentPlaylist(playlist);
               g_playlistPlayer.Play(pMsg->dwParam1);
             }
           }
@@ -340,7 +340,7 @@ void CApplicationMessenger::ProcessMessage(ThreadMessage *pMsg)
         }
         else if (pMsg->dwParam1 == PLAYLIST_MUSIC || pMsg->dwParam1 == PLAYLIST_VIDEO)
         {
-          if (g_playlistPlayer.GetCurrentPlaylist() != pMsg->dwParam1)
+          if (g_playlistPlayer.GetCurrentPlaylist() != (int)pMsg->dwParam1)
             g_playlistPlayer.SetCurrentPlaylist(pMsg->dwParam1);
 
           PlayListPlayerPlay(pMsg->dwParam2);
