@@ -69,7 +69,7 @@ namespace EPG
      * @param bUpdateDb If true, persist the changes.
      * @return True if the update was successful, false otherwise.
      */
-    virtual bool Update(const CEpg &epg, bool bUpdateDb = false);
+    virtual bool UpdateMetadata(const CEpg &epg, bool bUpdateDb = false);
 
     /*!
      * @brief Load all entries for this table from the database.
@@ -129,13 +129,6 @@ namespace EPG
      * @return True if this EPG has a PVR channel set, false otherwise.
      */
     virtual bool HasPVRChannel(void) const { return !(m_Channel == NULL); }
-
-    /*!
-     * @brief Delete an infotag from this EPG.
-     * @param tag The tag to delete.
-     * @return True if it was deleted successfully, false if not.
-     */
-    virtual bool DeleteInfoTag(CEpgInfoTag *tag);
 
     /*!
      * @brief Remove all entries from this EPG that finished before the given time
@@ -340,6 +333,8 @@ namespace EPG
      * @return True if the update was successful, false otherwise.
      */
     virtual bool UpdateEntries(const CEpg &epg, bool bStoreInDb = true);
+
+    virtual void UpdatePreviousAndNextPointers(void);
 
     /*!
      * @brief Update the cached first and last date.

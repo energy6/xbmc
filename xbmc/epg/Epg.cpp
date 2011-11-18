@@ -117,39 +117,6 @@ bool CEpg::HasValidEntries(void) const
           at(size()-1)->EndAsUTC() >= CDateTime::GetCurrentDateTime().GetAsUTCDateTime()); /* the last end time hasn't passed yet */
 }
 
-bool CEpg::DeleteInfoTag(CEpgInfoTag *tag)
-{
-  bool bReturn = false;
-
-  /* check if we're the "owner" of this tag */
-  if (*tag->m_Epg != *this)
-    return bReturn;
-
-  CSingleLock lock(m_critSection);
-
-  /* remove the tag */
-  for (unsigned int iTagPtr = 0; iTagPtr < size(); iTagPtr++)
-  {
-    CEpgInfoTag *entry = at(iTagPtr);
-    if (entry == tag)
-    {
-      /* fix previous and next pointers */
-      const CEpgInfoTag *previousTag = (iTagPtr > 0) ? at(iTagPtr - 1) : NULL;
-      const CEpgInfoTag *nextTag = (iTagPtr < size() - 1) ? at(iTagPtr + 1) : NULL;
-      if (previousTag)
-        previousTag->m_nextEvent = nextTag;
-      if (nextTag)
-        nextTag->m_previousEvent = previousTag;
-
-      erase(begin() + iTagPtr);
-      bReturn = true;
-      break;
-    }
-  }
-
-  return bReturn;
-}
-
 void CEpg::Sort(void)
 {
   CSingleLock lock(m_critSection);
@@ -161,6 +128,11 @@ void CEpg::Sort(void)
   sort(begin(), end(), sortEPGbyDate());
 
   /* reset the previous and next pointers on each tag */
+  UpdatePreviousAndNextPointers();
+}
+
+void CEpg::UpdatePreviousAndNextPointers(void)
+{
   int iTagAmount = size();
   for (int ptr = 0; ptr < iTagAmount; ptr++)
   {
@@ -168,18 +140,22 @@ void CEpg::Sort(void)
 
     if (ptr == 0)
     {
+      /* first tag has no previous event */
       tag->SetPreviousEvent(NULL);
     }
-
-    if (ptr > 0)
+    else
     {
+      /* set the next event in the previous tag */
       CEpgInfoTag *previousTag = at(ptr-1);
       previousTag->SetNextEvent(tag);
+
+      /* set the previous event in this tag */
       tag->SetPreviousEvent(previousTag);
     }
 
     if (ptr == iTagAmount - 1)
     {
+      /* ensure that the next event for the last tag is set to NULL */
       tag->SetNextEvent(NULL);
     }
   }
@@ -231,9 +207,11 @@ void CEpg::RemoveTagsBetween(time_t start, time_t end, bool bRemoveFromDb /* = f
 {
   CSingleLock lock(m_critSection);
 
+  /* sort the list before deleting */
   Sort();
   m_nowActive = NULL;
 
+  /* delete the tags */
   time_t tagBegin, tagEnd;
   for (int iTagPtr = (int) size() - 1; iTagPtr >= 0; iTagPtr--)
   {
@@ -242,12 +220,16 @@ void CEpg::RemoveTagsBetween(time_t start, time_t end, bool bRemoveFromDb /* = f
 
     if ((start > 0 && tagBegin >= start) ||
         (end > 0 && tagEnd <= end))
+    {
+      delete at(iTagPtr);
       erase(begin() + iTagPtr);
+    }
   }
 
-  Sort();
+  UpdatePreviousAndNextPointers();
   UpdateFirstAndLastDates();
 
+  /* delete the tags from the database */
   if (bRemoveFromDb)
   {
     CEpgDatabase *database = g_EpgContainer.GetDatabase();
@@ -703,7 +685,7 @@ const CDateTime &CEpg::GetLastDate(void) const
 /** @name Protected methods */
 //@{
 
-bool CEpg::Update(const CEpg &epg, bool bUpdateDb /* = false */)
+bool CEpg::UpdateMetadata(const CEpg &epg, bool bUpdateDb /* = false */)
 {
   bool bReturn = true;
   CSingleLock lock(m_critSection);
@@ -811,6 +793,9 @@ bool CEpg::UpdateFromScraper(time_t start, time_t end)
     CLog::Log(LOGERROR, "loading the EPG via scraper has not been implemented yet");
     // TODO: Add Support for Web EPG Scrapers here
   }
+
+  if (bGrabSuccess)
+    Sort();
 
   return bGrabSuccess;
 }
