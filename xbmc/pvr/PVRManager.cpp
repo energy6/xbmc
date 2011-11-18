@@ -892,8 +892,6 @@ int CPVRManager::TranslateIntInfo(DWORD dwInfo) const
   return !m_guiInfo ? 0 : m_guiInfo->TranslateIntInfo(dwInfo);
 }
 
-<<<<<<< HEAD
-=======
 bool CPVRManager::HasTimers(void) const
 {
   CSingleLock lock(m_critSection);
@@ -914,7 +912,6 @@ bool CPVRManager::IsRecording(void) const
   return m_recordings ? m_recordings->GetNumRecordings() > 0 : false;
 }
 
->>>>>>> upstream/master
 bool CPVRManager::IsIdle(void) const
 {
   CSingleLock lock(m_critSection);
@@ -924,11 +921,7 @@ bool CPVRManager::IsIdle(void) const
   }
   lock.Leave();
 
-<<<<<<< HEAD
-  if (TranslateBoolInfo(PVR_IS_RECORDING)) // pvr recording?
-=======
   if (IsRecording()) // pvr recording?
->>>>>>> upstream/master
   {
     return false;
   }
