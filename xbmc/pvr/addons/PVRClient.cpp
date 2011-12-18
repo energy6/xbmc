@@ -114,7 +114,7 @@ void CPVRClient::Create(int iClientId)
 
 void CPVRClient::Destroy(void)
 {
-  CLog::Log(LOGDEBUG, "PVR - %s - destroying PVR add-on '%s'", __FUNCTION__, GetFriendlyName());
+  CLog::Log(LOGDEBUG, "PVR - %s - destroying PVR add-on '%s'", __FUNCTION__, GetFriendlyName().c_str());
   m_bReadyToUse = false;
 
   try
@@ -127,7 +127,7 @@ void CPVRClient::Destroy(void)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to destroy addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 }
 
@@ -193,6 +193,7 @@ inline void PVRWriteClientTimerInfo(const CPVRTimerInfoTag &xbmcTimer, PVR_TIMER
   xbmcTimer.StartAsUTC().GetAsTime(start);
   xbmcTimer.EndAsUTC().GetAsTime(end);
   xbmcTimer.FirstDayAsUTC().GetAsTime(firstDay);
+  CEpgInfoTag *epgTag = xbmcTimer.GetEpgInfoTag();
 
   addonTimer.iClientIndex      = xbmcTimer.m_iClientIndex;
   addonTimer.state             = xbmcTimer.m_state;
@@ -207,7 +208,7 @@ inline void PVRWriteClientTimerInfo(const CPVRTimerInfoTag &xbmcTimer, PVR_TIMER
   addonTimer.startTime         = start - g_advancedSettings.m_iPVRTimeCorrection;
   addonTimer.endTime           = end - g_advancedSettings.m_iPVRTimeCorrection;
   addonTimer.firstDay          = firstDay - g_advancedSettings.m_iPVRTimeCorrection;
-  addonTimer.iEpgUid           = xbmcTimer.m_epgInfo ? xbmcTimer.m_epgInfo->UniqueBroadcastID() : -1;
+  addonTimer.iEpgUid           = epgTag ? epgTag->UniqueBroadcastID() : -1;
   addonTimer.strSummary        = xbmcTimer.m_strSummary.c_str();
   addonTimer.iMarginStart      = xbmcTimer.m_iMarginStart;
   addonTimer.iMarginEnd        = xbmcTimer.m_iMarginEnd;
@@ -238,36 +239,44 @@ PVR_ADDON_CAPABILITIES CPVRClient::GetAddonCapabilities(void)
   return m_addonCapabilities;
 }
 
-const char *CPVRClient::GetBackendName(void)
+CStdString CPVRClient::GetBackendName(void)
 {
   /* cached locally */
   SetBackendName();
 
-  return m_strBackendName.c_str();
+  CStdString strReturn;
+  strReturn = m_strBackendName;
+  return strReturn;
 }
 
-const char *CPVRClient::GetBackendVersion(void)
+CStdString CPVRClient::GetBackendVersion(void)
 {
   /* cached locally */
   SetBackendVersion();
 
-  return m_strBackendVersion.c_str();
+  CStdString strReturn;
+  strReturn = m_strBackendVersion;
+  return strReturn;
 }
 
-const char *CPVRClient::GetConnectionString(void)
+CStdString CPVRClient::GetConnectionString(void)
 {
   /* cached locally */
   SetConnectionString();
 
-  return m_strConnectionString.c_str();
+  CStdString strReturn;
+  strReturn = m_strConnectionString;
+  return strReturn;
 }
 
-const char *CPVRClient::GetFriendlyName(void)
+CStdString CPVRClient::GetFriendlyName(void)
 {
   /* cached locally */
   SetFriendlyName();
 
-  return m_strFriendlyName.c_str();
+  CStdString strReturn;
+  strReturn = m_strFriendlyName;
+  return strReturn;
 }
 
 PVR_ERROR CPVRClient::GetDriveSpace(long long *iTotal, long long *iUsed)
@@ -282,7 +291,7 @@ PVR_ERROR CPVRClient::GetDriveSpace(long long *iTotal, long long *iUsed)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetDriveSpace() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   /* default to 0 on error */
@@ -329,7 +338,7 @@ PVR_ERROR CPVRClient::StartChannelScan(void)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call StartChannelScan() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return PVR_ERROR_NOT_IMPLEMENTED;
@@ -347,7 +356,7 @@ void CPVRClient::CallMenuHook(const PVR_MENUHOOK &hook)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call CallMenuHook() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 }
 
@@ -377,13 +386,13 @@ PVR_ERROR CPVRClient::GetEPGForChannel(const CPVRChannel &channel, CEpg *epg, ti
     if (retVal != PVR_ERROR_NO_ERROR)
     {
       CLog::Log(LOGERROR, "PVRClient - %s - addon '%s' returns bad error (%i) from GetEPGForChannel()",
-          __FUNCTION__, GetFriendlyName(), retVal);
+          __FUNCTION__, GetFriendlyName().c_str(), retVal);
     }
   }
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetEPGForChannel() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return retVal;
@@ -405,7 +414,7 @@ int CPVRClient::GetChannelGroupsAmount(void)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetChannelGroupsAmount() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return iReturn;
@@ -430,13 +439,13 @@ PVR_ERROR CPVRClient::GetChannelGroups(CPVRChannelGroups *groups)
     if (retVal != PVR_ERROR_NO_ERROR)
     {
       CLog::Log(LOGERROR, "PVRClient - %s - addon '%s' returns bad error (%i) from GetChannelGroups()",
-          __FUNCTION__, GetFriendlyName(), retVal);
+          __FUNCTION__, GetFriendlyName().c_str(), retVal);
     }
   }
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetChannelGroups() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return retVal;
@@ -461,19 +470,19 @@ PVR_ERROR CPVRClient::GetChannelGroupMembers(CPVRChannelGroup *group)
     PVRWriteClientGroupInfo(*group, tag);
 
     CLog::Log(LOGDEBUG, "PVRClient - %s - get group members for group '%s' from add-on '%s'",
-        __FUNCTION__, tag.strGroupName, GetFriendlyName());
+        __FUNCTION__, tag.strGroupName, GetFriendlyName().c_str());
     retVal = m_pStruct->GetChannelGroupMembers(&handle, tag);
 
     if (retVal != PVR_ERROR_NO_ERROR)
     {
       CLog::Log(LOGERROR, "PVRClient - %s - addon '%s' returns bad error (%i) from GetChannelGroupMembers()",
-          __FUNCTION__, GetFriendlyName(), retVal);
+          __FUNCTION__, GetFriendlyName().c_str(), retVal);
     }
   }
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetChannelGroupMembers() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return retVal;
@@ -492,7 +501,7 @@ int CPVRClient::GetChannelsAmount(void)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetChannelsAmount() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return iReturn;
@@ -518,13 +527,13 @@ PVR_ERROR CPVRClient::GetChannels(CPVRChannelGroup &channels, bool radio)
     if (retVal != PVR_ERROR_NO_ERROR)
     {
       CLog::Log(LOGERROR, "PVRClient - %s - addon '%s' returns bad error (%i) from GetChannels()",
-          __FUNCTION__, GetFriendlyName(), retVal);
+          __FUNCTION__, GetFriendlyName().c_str(), retVal);
     }
   }
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetChannels() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return retVal;
@@ -546,7 +555,7 @@ int CPVRClient::GetRecordingsAmount(void)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetRecordingsAmount() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return iReturn;
@@ -571,13 +580,13 @@ PVR_ERROR CPVRClient::GetRecordings(CPVRRecordings *results)
     if (retVal != PVR_ERROR_NO_ERROR)
     {
       CLog::Log(LOGERROR, "PVRClient - %s - addon '%s' returns bad error (%i) from GetRecordings()",
-          __FUNCTION__, GetFriendlyName(), retVal);
+          __FUNCTION__, GetFriendlyName().c_str(), retVal);
     }
   }
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetRecordings() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return retVal;
@@ -602,13 +611,13 @@ PVR_ERROR CPVRClient::DeleteRecording(const CPVRRecording &recording)
     if (retVal != PVR_ERROR_NO_ERROR)
     {
       CLog::Log(LOGERROR, "PVRClient - %s - addon '%s' returns bad error (%i) from DeleteRecording()",
-          __FUNCTION__, GetFriendlyName(), retVal);
+          __FUNCTION__, GetFriendlyName().c_str(), retVal);
     }
   }
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call DeleteRecording() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return retVal;
@@ -633,13 +642,13 @@ PVR_ERROR CPVRClient::RenameRecording(const CPVRRecording &recording)
     if (retVal != PVR_ERROR_NO_ERROR)
     {
       CLog::Log(LOGERROR, "PVRClient - %s - addon '%s' returns bad error (%i) from RenameRecording()",
-          __FUNCTION__, GetFriendlyName(), retVal);
+          __FUNCTION__, GetFriendlyName().c_str(), retVal);
     }
   }
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call RenameRecording() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return retVal;
@@ -661,7 +670,7 @@ int CPVRClient::GetTimersAmount(void)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetTimersAmount() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return iReturn;
@@ -686,13 +695,13 @@ PVR_ERROR CPVRClient::GetTimers(CPVRTimers *results)
     if (retVal != PVR_ERROR_NO_ERROR)
     {
       CLog::Log(LOGERROR, "PVRClient - %s - addon '%s' returns bad error (%i) from GetTimers()",
-          __FUNCTION__, GetFriendlyName(), retVal);
+          __FUNCTION__, GetFriendlyName().c_str(), retVal);
     }
   }
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetTimers() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return retVal;
@@ -717,13 +726,13 @@ PVR_ERROR CPVRClient::AddTimer(const CPVRTimerInfoTag &timer)
     if (retVal != PVR_ERROR_NO_ERROR)
     {
       CLog::Log(LOGERROR, "PVRClient - %s - addon '%s' returns bad error (%i) from AddTimer()",
-          __FUNCTION__, GetFriendlyName(), retVal);
+          __FUNCTION__, GetFriendlyName().c_str(), retVal);
     }
   }
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call AddTimer() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return retVal;
@@ -748,13 +757,13 @@ PVR_ERROR CPVRClient::DeleteTimer(const CPVRTimerInfoTag &timer, bool bForce /* 
     if (retVal != PVR_ERROR_NO_ERROR)
     {
       CLog::Log(LOGERROR, "PVRClient - %s - addon '%s' returns bad error (%i) from DeleteTimer()",
-          __FUNCTION__, GetFriendlyName(), retVal);
+          __FUNCTION__, GetFriendlyName().c_str(), retVal);
     }
   }
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call DeleteTimer() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return retVal;
@@ -779,13 +788,13 @@ PVR_ERROR CPVRClient::RenameTimer(const CPVRTimerInfoTag &timer, const CStdStrin
     if (retVal != PVR_ERROR_NO_ERROR)
     {
       CLog::Log(LOGERROR, "PVRClient - %s - addon '%s' returns bad error (%i) from RenameTimer()",
-          __FUNCTION__, GetFriendlyName(), retVal);
+          __FUNCTION__, GetFriendlyName().c_str(), retVal);
     }
   }
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call RenameTimer() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return retVal;
@@ -810,13 +819,13 @@ PVR_ERROR CPVRClient::UpdateTimer(const CPVRTimerInfoTag &timer)
     if (retVal != PVR_ERROR_NO_ERROR)
     {
       CLog::Log(LOGERROR, "PVRClient - %s - addon '%s' returns bad error (%i) from UpdateTimer()",
-          __FUNCTION__, GetFriendlyName(), retVal);
+          __FUNCTION__, GetFriendlyName().c_str(), retVal);
     }
   }
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call UpdateTimer() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return retVal;
@@ -841,7 +850,7 @@ bool CPVRClient::OpenLiveStream(const CPVRChannel &channel)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call OpenLiveStream() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return bReturn;
@@ -859,7 +868,7 @@ void CPVRClient::CloseLiveStream(void)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call CloseLiveStream() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 }
 
@@ -907,7 +916,7 @@ bool CPVRClient::SignalQuality(PVR_SIGNAL_STATUS &qualityinfo)
     if (error != PVR_ERROR_NO_ERROR)
     {
       CLog::Log(LOGERROR, "PVRClient - %s - addon '%s' returns bad error (%i) from SignalQuality()",
-          __FUNCTION__, GetFriendlyName(), error);
+          __FUNCTION__, GetFriendlyName().c_str(), error);
     }
     else
     {
@@ -917,18 +926,18 @@ bool CPVRClient::SignalQuality(PVR_SIGNAL_STATUS &qualityinfo)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call SignalQuality() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return bReturn;
 }
 
-const char *CPVRClient::GetLiveStreamURL(const CPVRChannel &channel)
+CStdString CPVRClient::GetLiveStreamURL(const CPVRChannel &channel)
 {
-  static CStdString strReturn = "";
   if (!m_bReadyToUse)
-    return strReturn.c_str();
+    return StringUtils::EmptyString;
 
+  CStdString strReturn;
   try
   {
     PVR_CHANNEL tag;
@@ -938,10 +947,10 @@ const char *CPVRClient::GetLiveStreamURL(const CPVRChannel &channel)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetLiveStreamURL() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
-  return strReturn.c_str();
+  return strReturn;
 }
 
 bool CPVRClient::OpenRecordedStream(const CPVRRecording &recording)
@@ -988,7 +997,7 @@ PVR_ERROR CPVRClient::GetStreamProperties(PVR_STREAM_PROPERTIES *props)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetStreamProperties() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
 
     /* Set all properties in a case of exception to not supported */
   }
@@ -1057,7 +1066,7 @@ void CPVRClient::SetBackendName(void)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetBackendName() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 }
 
@@ -1075,7 +1084,7 @@ void CPVRClient::SetBackendVersion(void)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetBackendVersion() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 }
 
@@ -1093,7 +1102,7 @@ void CPVRClient::SetConnectionString(void)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetConnectionString() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 }
 
@@ -1104,7 +1113,7 @@ void CPVRClient::SetFriendlyName(void)
 
    m_bGotFriendlyName  = true;
 
-  m_strFriendlyName.Format("%s:%s", GetBackendName(), GetConnectionString());
+  m_strFriendlyName.Format("%s:%s", GetBackendName().c_str(), GetConnectionString().c_str());
 }
 
 PVR_ERROR CPVRClient::SetAddonCapabilities(void)
@@ -1126,7 +1135,7 @@ PVR_ERROR CPVRClient::SetAddonCapabilities(void)
   catch (exception &e)
   {
     CLog::Log(LOGERROR, "PVRClient - %s - exception '%s' caught while trying to call GetProperties() on addon '%s'. please contact the developer of this addon: %s",
-        __FUNCTION__, e.what(), GetFriendlyName(), Author().c_str());
+        __FUNCTION__, e.what(), GetFriendlyName().c_str(), Author().c_str());
   }
 
   return PVR_ERROR_SERVER_ERROR;

@@ -27,6 +27,7 @@
 #include "threads/SingleLock.h"
 #include "utils/log.h"
 #include "utils/URIUtils.h"
+#include "utils/StringUtils.h"
 
 #include "PVRTimers.h"
 #include "pvr/PVRManager.h"
@@ -194,7 +195,7 @@ bool CPVRTimers::UpdateEntries(CPVRTimers *timers)
         timerNotifications.push_back(strMessage);
       }
 
-      CEpgInfoTag *epgTag = at(iTimerPtr)->m_epgInfo;
+      CEpgInfoTag *epgTag = at(iTimerPtr)->GetEpgInfoTag();
       if (epgTag)
         epgTag->SetTimer(NULL);
 
@@ -259,7 +260,7 @@ int CPVRTimers::GetTimers(CFileItemList* results)
   return size();
 }
 
-bool CPVRTimers::GetNextActiveTimer(CPVRTimerInfoTag *tag)
+bool CPVRTimers::GetNextActiveTimer(CPVRTimerInfoTag *tag) const
 {
   bool bReturn(false);
   bool bGotFirst(false);
@@ -280,7 +281,7 @@ bool CPVRTimers::GetNextActiveTimer(CPVRTimerInfoTag *tag)
   return bReturn;
 }
 
-int CPVRTimers::GetActiveTimers(vector<CPVRTimerInfoTag *> *tags)
+int CPVRTimers::GetActiveTimers(vector<CPVRTimerInfoTag *> *tags) const
 {
   int iInitialSize = tags->size();
   CSingleLock lock(m_critSection);
@@ -422,9 +423,9 @@ CPVRTimerInfoTag *CPVRTimers::InstantTimer(CPVRChannel *channel, bool bStartTime
   if (!channel)
     return NULL;
 
-  const CEpgInfoTag *epgTag = channel->GetEPGNow();
-
-  CPVRTimerInfoTag *newTimer = epgTag ? CPVRTimerInfoTag::CreateFromEpg(*epgTag) : NULL;
+  CEpgInfoTag epgTag;
+  bool bHasEpgNow = channel->GetEPGNow(epgTag);
+  CPVRTimerInfoTag *newTimer = bHasEpgNow ? CPVRTimerInfoTag::CreateFromEpg(epgTag) : NULL;
   if (!newTimer)
   {
     newTimer = new CPVRTimerInfoTag;
@@ -441,17 +442,17 @@ CPVRTimerInfoTag *CPVRTimers::InstantTimer(CPVRChannel *channel, bool bStartTime
     newTimer->m_strSummary.Format("%s %s %s %s %s",
         newTimer->StartAsLocalTime().GetAsLocalizedDate(),
         g_localizeStrings.Get(19159),
-        newTimer->StartAsLocalTime().GetAsLocalizedTime("", false),
+        newTimer->StartAsLocalTime().GetAsLocalizedTime(StringUtils::EmptyString, false),
         g_localizeStrings.Get(19160),
-        newTimer->EndAsLocalTime().GetAsLocalizedTime("", false));
+        newTimer->EndAsLocalTime().GetAsLocalizedTime(StringUtils::EmptyString, false));
   }
 
-  CDateTime startTime;
+  CDateTime startTime(0);
   newTimer->SetStartFromUTC(startTime);
   newTimer->m_iMarginStart = 0; /* set the start margin to 0 for instant timers */
 
   int iDuration = g_guiSettings.GetInt("pvrrecord.instantrecordtime");
-  CDateTime endTime = CDateTime::GetCurrentDateTime().GetAsUTCDateTime() + CDateTimeSpan(0, 0, iDuration ? iDuration : 120, 0);
+  CDateTime endTime = CDateTime::GetUTCDateTime() + CDateTimeSpan(0, 0, iDuration ? iDuration : 120, 0);
   newTimer->SetEndFromUTC(endTime);
 
   /* unused only for reference */
@@ -637,4 +638,50 @@ void CPVRTimers::Notify(const Observable &obs, const CStdString& msg)
 {
   if (msg.Equals("epg"))
     g_PVRManager.TriggerTimersUpdate();
+}
+
+CDateTime CPVRTimers::GetNextEventTime(void) const
+{
+  const CStdString wakeupcmd = g_guiSettings.GetString("pvrpowermanagement.setwakeupcmd", false);
+  const bool dailywakup = g_guiSettings.GetBool("pvrpowermanagement.dailywakeup");
+  const CDateTime now = CDateTime::GetUTCDateTime();
+  const CDateTimeSpan prewakeup(0, 0, g_guiSettings.GetInt("pvrpowermanagement.prewakeup"), 0);
+  const CDateTimeSpan idle(0, 0, g_guiSettings.GetInt("pvrpowermanagement.backendidletime"), 0);
+
+  CDateTime timerwakeuptime;
+  CDateTime dailywakeuptime;
+
+  /* Check next active time */
+  CPVRTimerInfoTag timer;
+  if (GetNextActiveTimer(&timer))
+  {
+    const CDateTime start = timer.StartAsUTC();
+
+    if ((start - idle) > now) {
+      timerwakeuptime = start - prewakeup;
+    } else {
+      timerwakeuptime = now + idle;
+    }
+  }
+
+  /* check daily wake up */
+  if (dailywakup)
+  {
+    dailywakeuptime.SetFromDBTime(g_guiSettings.GetString("pvrpowermanagement.dailywakeuptime", false));
+    dailywakeuptime = dailywakeuptime.GetAsUTCDateTime();
+
+    dailywakeuptime.SetDateTime(
+      now.GetYear(), now.GetMonth(), now.GetDay(),
+      dailywakeuptime.GetHour(), dailywakeuptime.GetMinute(), dailywakeuptime.GetSecond()
+    );
+
+    if ((dailywakeuptime - idle) < now)
+    {
+      const CDateTimeSpan oneDay(1,0,0,0);
+      dailywakeuptime += oneDay;
+    }
+  }
+
+  const CDateTime retVal((dailywakeuptime < timerwakeuptime) ? dailywakeuptime : timerwakeuptime);
+  return retVal;
 }

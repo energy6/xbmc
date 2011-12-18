@@ -368,12 +368,10 @@ void CVDPAU::OnLostDevice()
 {
   CLog::Log(LOGNOTICE,"CVDPAU::OnLostDevice event");
 
-  { CExclusiveLock lock(m_DecoderSection);
-    FiniVDPAUOutput();
-    FiniVDPAUProcs();
-  }
+  CExclusiveLock lock(m_DecoderSection);
+  FiniVDPAUOutput();
+  FiniVDPAUProcs();
 
-  CExclusiveLock lock(m_DisplaySection);
   m_DisplayState = VDPAU_LOST;
   m_DisplayEvent.Reset();
 }
@@ -410,7 +408,7 @@ int CVDPAU::Check(AVCodecContext* avctx)
       state = m_DisplayState;
     }
   }
-  if (state == VDPAU_RESET)
+  if (state == VDPAU_RESET || state == VDPAU_ERROR)
   {
     CLog::Log(LOGNOTICE,"Attempting recovery");
 
@@ -422,7 +420,10 @@ int CVDPAU::Check(AVCodecContext* avctx)
 
     InitVDPAUProcs();
 
-    return VC_FLUSHED;
+    if (state == VDPAU_RESET)
+      return VC_FLUSHED;
+    else
+      return VC_ERROR;
   }
   return 0;
 }
@@ -1294,11 +1295,11 @@ int CVDPAU::Decode(AVCodecContext *avctx, AVFrame *pFrame)
   VdpStatus vdp_st;
   VdpTime time;
 
-  CSharedLock lock(m_DecoderSection);
-
   int result = Check(avctx);
   if (result)
     return result;
+
+  CSharedLock lock(m_DecoderSection);
 
   if (!vdpauConfigured)
     return VC_ERROR;
@@ -1572,7 +1573,12 @@ bool CVDPAU::CheckStatus(VdpStatus vdp_st, int line)
     CExclusiveLock lock(m_DisplaySection);
 
     if(m_DisplayState == VDPAU_OPEN)
-      m_DisplayState = VDPAU_RESET;
+    {
+      if (vdp_st == VDP_STATUS_DISPLAY_PREEMPTED)
+        m_DisplayState = VDPAU_LOST;
+      else
+        m_DisplayState = VDPAU_ERROR;
+    }
 
     return true;
   }

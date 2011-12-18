@@ -1012,13 +1012,17 @@ namespace VIDEO
     if (!m_database.Open())
       return -1;
 
-    CVideoInfoTag *tag = pItem->GetVideoInfoTag();
-    CStdString strTitle(tag->m_strTitle);
+    CVideoInfoTag &movieDetails = *pItem->GetVideoInfoTag();
+    if (movieDetails.m_basePath.IsEmpty())
+      movieDetails.m_basePath = pItem->GetBaseMoviePath(videoFolder);
+    movieDetails.m_parentPathID = m_database.AddPath(URIUtils::GetParentPath(movieDetails.m_basePath));
+
+    CStdString strTitle(movieDetails.m_strTitle);
 
     if (idShow > -1 && content == CONTENT_TVSHOWS)
     {
       CStdString strShowTitle = m_database.GetTvShowTitleById(idShow);
-      strTitle.Format("%s - %ix%i - %s", strShowTitle.c_str(), tag->m_iSeason, tag->m_iEpisode, tag->m_strTitle.c_str());
+      strTitle.Format("%s - %ix%i - %s", strShowTitle.c_str(), movieDetails.m_iSeason, movieDetails.m_iEpisode, strTitle.c_str());
     }
 
     if (m_pObserver)
@@ -1026,11 +1030,6 @@ namespace VIDEO
 
     CLog::Log(LOGDEBUG, "VideoInfoScanner: Adding new item to %s:%s", TranslateContent(content).c_str(), pItem->GetPath().c_str());
     long lResult = -1;
-
-    CVideoInfoTag &movieDetails = *pItem->GetVideoInfoTag();
-    if (movieDetails.m_basePath.IsEmpty())
-      movieDetails.m_basePath = pItem->GetBaseMoviePath(videoFolder);
-    movieDetails.m_parentPathID = m_database.AddPath(URIUtils::GetParentPath(movieDetails.m_basePath));
 
     if (content == CONTENT_MOVIES)
     {
@@ -1386,8 +1385,8 @@ namespace VIDEO
       CStdString strPath;
       URIUtils::GetDirectory(item->GetPath(), strPath);
 
-      if (bGrabAny)
-      { // looking up by folder name - movie.nfo takes priority
+      if (bGrabAny && !item->IsStack())
+      { // looking up by folder name - movie.nfo takes priority - but not for stacked items (handled below)
         nfoFile = URIUtils::AddFileToFolder(strPath, "movie.nfo");
         if (CFile::Exists(nfoFile))
           return nfoFile;
