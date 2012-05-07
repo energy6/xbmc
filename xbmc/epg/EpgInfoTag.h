@@ -233,7 +233,7 @@ namespace EPG
      * @brief Get the genre as human readable string.
      * @return The genre.
      */
-    virtual CStdString Genre(void) const;
+    virtual const std::vector<std::string> Genre(void) const;
 
     /*!
      * @brief Change the first air date of this event.
@@ -376,6 +376,18 @@ namespace EPG
     virtual PVR::CPVRTimerInfoTag *Timer(void) const;
 
     /*!
+     * @brief Set the PVR channel ID of the tag
+     * @param The new value
+     */
+    virtual void SetPVRChannelID(int iPVRChannelID);
+
+    /*!
+     * @brief Set the PVR channel number of the tag
+     * @param The new value
+     */
+    virtual void SetPVRChannelNumber(int iPVRChannelNumber);
+
+    /*!
      * @return True if this tag has a PVR channel set.
      */
     virtual bool HasPVRChannel(void) const;
@@ -437,7 +449,7 @@ namespace EPG
     CStdString             m_strTitle;           /*!< title */
     CStdString             m_strPlotOutline;     /*!< plot outline */
     CStdString             m_strPlot;            /*!< plot */
-    CStdString             m_strGenre;           /*!< genre */
+    std::vector<std::string> m_genre;            /*!< genre */
     CStdString             m_strEpisodeName;     /*!< episode name */
     CStdString             m_strIconPath;        /*!< the path to the icon */
     CStdString             m_strFileNameAndPath; /*!< the filename and path */

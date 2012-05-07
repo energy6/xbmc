@@ -503,7 +503,7 @@ bool URIUtils::IsHD(const CStdString& strFileName)
   if (IsInArchive(strFileName))
     return IsHD(url.GetHostName());
 
-  return url.IsLocal();
+  return url.GetProtocol().IsEmpty() || url.GetProtocol() == "file";
 }
 
 bool URIUtils::IsDVD(const CStdString& strFile)
@@ -725,28 +725,33 @@ bool URIUtils::IsHTSP(const CStdString& strFile)
   return strFile.Left(5).Equals("htsp:");
 }
 
+bool URIUtils::IsLiveTV(const CStdString& strFile)
+{
+  CStdString strFileWithoutSlash(strFile);
+  RemoveSlashAtEnd(strFileWithoutSlash);
+
+  if(IsTuxBox(strFile)
+  || IsVTP(strFile)
+  || IsHDHomeRun(strFile)
+  || IsSlingbox(strFile)
+  || IsHTSP(strFile)
+  || strFile.Left(4).Equals("sap:")
+  ||(strFileWithoutSlash.Right(4).Equals(".pvr") && !strFileWithoutSlash.Left(16).Equals("pvr://recordings")))
+    return true;
+
+  if (IsMythTV(strFile) && CMythDirectory::IsLiveTV(strFile))
+    return true;
+
+  return false;
+}
+
 bool URIUtils::IsPVRRecording(const CStdString& strFile)
 {
   CStdString strFileWithoutSlash(strFile);
   RemoveSlashAtEnd(strFileWithoutSlash);
 
   return strFileWithoutSlash.Right(4).Equals(".pvr") &&
-      strFile.Left(16).Equals("pvr://recordings");
-}
-
-bool URIUtils::IsLiveTV(const CStdString& strFile)
-{
-  CStdString strFileWithoutSlash(strFile);
-  RemoveSlashAtEnd(strFileWithoutSlash);
-
-  return IsTuxBox(strFileWithoutSlash) ||
-      IsVTP(strFileWithoutSlash) ||
-      IsHDHomeRun(strFileWithoutSlash) ||
-      IsSlingbox(strFileWithoutSlash) ||
-      IsHTSP(strFileWithoutSlash) ||
-      strFileWithoutSlash.Left(4).Equals("sap:") ||
-      (strFileWithoutSlash.Right(4).Equals(".pvr") && !strFileWithoutSlash.Left(16).Equals("pvr://recordings")) ||
-      (IsMythTV(strFileWithoutSlash) && CMythDirectory::IsLiveTV(strFileWithoutSlash));
+         strFile.Left(16).Equals("pvr://recordings");
 }
 
 bool URIUtils::IsMusicDb(const CStdString& strFile)

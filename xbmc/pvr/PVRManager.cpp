@@ -28,6 +28,7 @@
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
 #include "music/tags/MusicInfoTag.h"
+#include "settings/AdvancedSettings.h"
 #include "settings/GUISettings.h"
 #include "settings/Settings.h"
 #include "threads/SingleLock.h"
@@ -581,6 +582,36 @@ int CPVRManager::GetPreviousChannel(void)
   return iReturn;
 }
 
+bool CPVRManager::ToggleRecordingOnChannel(unsigned int iChannelId)
+{
+  bool bReturn = false;
+
+  CPVRChannel *channel;
+  channel = m_channelGroups->GetChannelById(iChannelId);
+  if (!channel)
+    return bReturn;
+
+  if (m_addons->HasTimerSupport(channel->ClientID()))
+  {
+    /* timers are supported on this channel */
+    if (!channel->IsRecording())
+    {
+      CPVRTimerInfoTag *newTimer = m_timers->InstantTimer(channel);
+      if (!newTimer)
+        CGUIDialogOK::ShowAndGetInput(19033,0,19164,0);
+      else
+        bReturn = true;
+    }
+    else
+    {
+      /* delete active timers */
+      bReturn = m_timers->DeleteTimersOnChannel(*channel, false, true);
+    }
+  }
+
+  return bReturn;
+}
+
 bool CPVRManager::StartRecordingOnPlayingChannel(bool bOnOff)
 {
   bool bReturn = false;
@@ -751,7 +782,8 @@ bool CPVRManager::UpdateItem(CFileItem& item)
     if (musictag)
     {
       musictag->SetTitle(bHasTagNow ? epgTagNow.Title() : g_localizeStrings.Get(19055));
-      musictag->SetGenre(bHasTagNow ? epgTagNow.Genre() : StringUtils::EmptyString);
+      if (bHasTagNow)
+        musictag->SetGenre(epgTagNow.Genre());
       musictag->SetDuration(bHasTagNow ? epgTagNow.GetDuration() : 3600);
       musictag->SetURL(channelTag->Path());
       musictag->SetArtist(channelTag->ChannelName());
@@ -767,7 +799,8 @@ bool CPVRManager::UpdateItem(CFileItem& item)
     if (videotag)
     {
       videotag->m_strTitle = bHasTagNow ? epgTagNow.Title() : g_localizeStrings.Get(19055);
-      videotag->m_strGenre = bHasTagNow ? epgTagNow.Genre() : StringUtils::EmptyString;
+      if (bHasTagNow)
+        videotag->m_genre = epgTagNow.Genre();
       videotag->m_strPath = channelTag->Path();
       videotag->m_strFileNameAndPath = channelTag->Path();
       videotag->m_strPlot = bHasTagNow ? epgTagNow.Plot() : StringUtils::EmptyString;

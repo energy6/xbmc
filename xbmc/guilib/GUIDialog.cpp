@@ -35,7 +35,10 @@ CGUIDialog::CGUIDialog(int id, const CStdString &xmlFile)
   m_wasRunning = false;
   m_renderOrder = 1;
   m_autoClosing = false;
+  m_showStartTime = 0;
+  m_showDuration = 0;
   m_enableSound = true;
+  m_bAutoClosed = false;
 }
 
 CGUIDialog::~CGUIDialog(void)
@@ -97,7 +100,7 @@ bool CGUIDialog::OnMessage(CGUIMessage& message)
   case GUI_MSG_WINDOW_INIT:
     {
       CGUIWindow::OnMessage(message);
-      m_showStartTime = CTimeUtils::GetFrameTime();
+      m_showStartTime = 0;
       return true;
     }
   }
@@ -226,8 +229,22 @@ void CGUIDialog::Show()
 
 void CGUIDialog::FrameMove()
 {
-  if (m_autoClosing && m_showStartTime + m_showDuration < CTimeUtils::GetFrameTime() && !m_closing)
-    Close();
+  if (m_autoClosing)
+  { // check if our timer is running
+    if (!m_showStartTime)
+    {
+      if (HasRendered()) // start timer
+        m_showStartTime = CTimeUtils::GetFrameTime();
+    }
+    else
+    {
+      if (m_showStartTime + m_showDuration < CTimeUtils::GetFrameTime() && !m_closing)
+      {
+        m_bAutoClosed = true;
+        Close();
+      }
+    }
+  }
   CGUIWindow::FrameMove();
 }
 
@@ -249,8 +266,11 @@ void CGUIDialog::SetAutoClose(unsigned int timeoutMs)
 {
    m_autoClosing = true;
    m_showDuration = timeoutMs;
-   if (m_active)
-     m_showStartTime = CTimeUtils::GetFrameTime();
+   ResetAutoClose();
 }
 
-
+void CGUIDialog::ResetAutoClose(void)
+{
+  if (m_autoClosing && m_active)
+    m_showStartTime = CTimeUtils::GetFrameTime();
+}
