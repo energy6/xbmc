@@ -22,6 +22,7 @@
 #include "system.h"
 #include "GUIAudioManager.h"
 #include "Key.h"
+#include "settings/AdvancedSettings.h"
 #include "settings/GUISettings.h"
 #include "input/ButtonTranslator.h"
 #include "threads/SingleLock.h"
@@ -84,10 +85,7 @@ void CGUIAudioManager::PlayActionSound(const CAction& action)
     return;
 
   if (it->second)
-  {
-    it->second->SetVolume(m_iVolume);
     it->second->Play();;
-  }
 }
 
 // \brief Play a sound associated with a window and its event
@@ -119,7 +117,6 @@ void CGUIAudioManager::PlayWindowSound(int id, WINDOW_SOUND event)
   if (!sound)
     return;
 
-  sound->SetVolume(m_iVolume);
   sound->Play();
 }
 
@@ -306,6 +303,8 @@ IAESound* CGUIAudioManager::LoadSound(const CStdString &filename)
   if (!sound)
     return NULL;
 
+  sound->SetVolume(g_advancedSettings.m_navSoundLevel);
+
   CSoundInfo info;
   info.usage = 1;
   info.sound = sound;
@@ -357,14 +356,12 @@ void CGUIAudioManager::SetVolume(float level)
 {
   CSingleLock lock(m_cs);
 
-  m_iVolume = level * g_guiSettings.GetInt("lookandfeel.soundvol") / 100;
-
   {
     actionSoundMap::iterator it = m_actionSoundMap.begin();
     while (it!=m_actionSoundMap.end())
     {
       if (it->second)
-        it->second->SetVolume(m_iVolume);
+        it->second->SetVolume(level);
       ++it;
     }
   }
@@ -380,7 +377,7 @@ void CGUIAudioManager::SetVolume(float level)
     while (it != m_pythonSounds.end())
     {
       if (it->second)
-        it->second->SetVolume(m_iVolume);
+        it->second->SetVolume(level);
 
       ++it;
     }

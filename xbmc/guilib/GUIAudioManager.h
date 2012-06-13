@@ -83,7 +83,6 @@ private:
   CStdString          m_strMediaDir;
   bool                m_bInitialized;
   bool                m_bEnabled;
-  int                 m_iVolume;
 
   CCriticalSection    m_cs;
 
