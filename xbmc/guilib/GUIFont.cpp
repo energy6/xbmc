@@ -27,7 +27,19 @@
 #include "utils/TimeUtils.h"
 #include "utils/MathUtils.h"
 
+#include "utils/CharsetConverter.h"
+
 #define ROUND(x) (float)(MathUtils::round_int(x))
+
+CScrollInfo::CScrollInfo(unsigned int wait /* = 50 */, float pos /* = 0 */,
+  int speed /* = defaultSpeed */, const CStdString &scrollSuffix /* = " | " */)
+{
+    initialWait = wait;
+    initialPos = pos;
+    SetSpeed(speed ? speed : defaultSpeed);
+    g_charsetConverter.utf8ToW(scrollSuffix, suffix);
+    Reset();
+}
 
 float CScrollInfo::GetPixelsPerFrame()
 {
@@ -50,7 +62,7 @@ CGUIFont::CGUIFont(const CStdString& strFontName, uint32_t style, color_t textCo
 		   color_t shadowColor, float lineSpacing, float origHeight, CGUIFontTTFBase *font)
 {
   m_strFontName = strFontName;
-  m_style = style & 3;
+  m_style = style & FONT_STYLE_MASK;
   m_textColor = textColor;
   m_shadowColor = shadowColor;
   m_lineSpacing = lineSpacing;

@@ -22,11 +22,11 @@
 #include "threads/SingleLock.h"
 #include "utils/log.h"
 #include "DVDAudio.h"
-#include "Util.h"
 #include "DVDClock.h"
 #include "DVDCodecs/DVDCodecs.h"
 #include "DVDPlayerAudio.h"
 #include "cores/AudioEngine/AEFactory.h"
+#include "cores/AudioEngine/Interfaces/AEStream.h"
 #include "settings/Settings.h"
 
 using namespace std;
@@ -35,6 +35,7 @@ CDVDAudio::CDVDAudio(volatile bool &bStop)
   : m_bStop(bStop)
 {
   m_pAudioStream = NULL;
+  m_pAudioCallback = NULL;
   m_iBufferSize = 0;
   m_dwPacketSize = 0;
   m_pBuffer = NULL;
@@ -49,7 +50,7 @@ CDVDAudio::~CDVDAudio()
 {
   CSingleLock lock (m_critSection);
   if (m_pAudioStream)
-    CAEFactory::AE->FreeStream(m_pAudioStream);
+    CAEFactory::FreeStream(m_pAudioStream);
 
   free(m_pBuffer);
 }
@@ -69,7 +70,7 @@ bool CDVDAudio::Create(const DVDAudioFrame &audioframe, CodecID codec, bool need
   unsigned int options = needresampler && !audioframe.passthrough ? AESTREAM_FORCE_RESAMPLE : 0;
   options |= AESTREAM_AUTOSTART;
 
-  m_pAudioStream = CAEFactory::AE->MakeStream(
+  m_pAudioStream = CAEFactory::MakeStream(
     audioframe.data_format,
     audioframe.sample_rate,
     audioframe.encoded_sample_rate,
@@ -92,6 +93,9 @@ bool CDVDAudio::Create(const DVDAudioFrame &audioframe, CodecID codec, bool need
   m_iBufferSize = 0;
   SetDynamicRangeCompression((long)(g_settings.m_currentVideoSettings.m_VolumeAmplification * 100));
 
+  if (m_pAudioCallback)
+    RegisterAudioCallback(m_pAudioCallback);
+
   return true;
 }
 
@@ -100,7 +104,7 @@ void CDVDAudio::Destroy()
   CSingleLock lock (m_critSection);
 
   if (m_pAudioStream)
-    CAEFactory::AE->FreeStream(m_pAudioStream);
+    CAEFactory::FreeStream(m_pAudioStream);
 
   free(m_pBuffer);
   m_pBuffer = NULL;
@@ -231,6 +235,22 @@ void CDVDAudio::Drain()
   CSingleLock lock (m_critSection);
   if (m_pAudioStream)
     m_pAudioStream->Drain();
+}
+
+void CDVDAudio::RegisterAudioCallback(IAudioCallback* pCallback)
+{
+  CSingleLock lock (m_critSection);
+  m_pAudioCallback = pCallback;
+  if (m_pAudioStream)
+    m_pAudioStream->RegisterAudioCallback(pCallback);
+}
+
+void CDVDAudio::UnRegisterAudioCallback()
+{
+  CSingleLock lock (m_critSection);
+  if (m_pAudioStream)
+    m_pAudioStream->UnRegisterAudioCallback();
+  m_pAudioCallback = NULL;
 }
 
 void CDVDAudio::SetVolume(float volume)

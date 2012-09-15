@@ -28,7 +28,6 @@
 #include "NfoFile.h"
 #include "utils/RegExp.h"
 #include "utils/md5.h"
-#include "pictures/Picture.h"
 #include "filesystem/StackDirectory.h"
 #include "VideoInfoDownloader.h"
 #include "GUIInfoManager.h"
@@ -48,6 +47,7 @@
 #include "utils/Variant.h"
 #include "ThumbLoader.h"
 #include "TextureCache.h"
+#include "URL.h"
 
 using namespace std;
 using namespace XFILE;
@@ -673,7 +673,7 @@ namespace VIDEO
     */
 
     // since we're doing this now anyway, should other items be stacked?
-    items.Sort(SORT_METHOD_FULLPATH, SORT_ORDER_ASC);
+    items.Sort(SORT_METHOD_FULLPATH, SortOrderAscending);
     int x = 0;
     while (x < items.Size())
     {
@@ -944,8 +944,8 @@ namespace VIDEO
             offset += regexp2pos + reg2.GetFindLen();
           }
         }
-        free(remainder);
       }
+      free(remainder);
       return true;
     }
     return false;
@@ -1011,7 +1011,7 @@ namespace VIDEO
     return episodeInfo.cDate.IsValid();
   }
 
-  long CVideoInfoScanner::AddVideo(CFileItem *pItem, const CONTENT_TYPE &content, bool videoFolder, bool useLocal, int idShow)
+  long CVideoInfoScanner::AddVideo(CFileItem *pItem, const CONTENT_TYPE &content, bool videoFolder /* = false */, bool useLocal /* = true */, int idShow /* = -1 */, bool libraryImport /* = false */)
   {
     // ensure our database is open (this can get called via other classes)
     if (!m_database.Open())
@@ -1102,8 +1102,12 @@ namespace VIDEO
       movieDetails.m_iDbId = lResult;
     }
 
-    if (g_advancedSettings.m_bVideoLibraryImportWatchedState)
+    if (g_advancedSettings.m_bVideoLibraryImportWatchedState || libraryImport)
       m_database.SetPlayCount(*pItem, movieDetails.m_playCount, movieDetails.m_lastPlayed);
+
+    if ((g_advancedSettings.m_bVideoLibraryImportResumePoint || libraryImport) &&
+        movieDetails.m_resumePoint.IsSet())
+      m_database.AddBookMarkToFile(pItem->GetPath(), movieDetails.m_resumePoint, CBookmark::RESUME);
 
     m_database.Close();
 
@@ -1185,25 +1189,6 @@ namespace VIDEO
       FetchActorThumbs(movieDetails.m_cast, parentDir);
     if (bApplyToDir)
       ApplyThumbToFolder(parentDir, thumb);
-  }
-
-  void CVideoInfoScanner::DownloadImage(const CStdString &url, const CStdString &destination, bool asThumb /*= true */, CGUIDialogProgress *progress /*= NULL */)
-  {
-    if (progress)
-    {
-      progress->SetLine(2, 415);
-      progress->Progress();
-    }
-    bool result = false;
-    if (asThumb)
-      result = CPicture::CreateThumbnail(url, destination);
-    else
-      result = CPicture::CacheFanart(url, destination);
-    if (!result)
-    {
-      CFile::Delete(destination);
-      return;
-    }
   }
 
   INFO_RET CVideoInfoScanner::OnProcessSeriesFolder(EPISODES& files, const ADDON::ScraperPtr &scraper, bool useLocal, int idShow, const CStdString& strShowTitle, CGUIDialogProgress* pDlgProgress /* = NULL */)
@@ -1607,7 +1592,10 @@ namespace VIDEO
             art.insert(make_pair(0, items[i]->GetPath()));
           else if (reg.RegFind(name) > -1)
           {
-            int season = atoi(reg.GetReplaceString("\\1"));
+            char* seasonStr = reg.GetReplaceString("\\1");
+            int season = atoi(seasonStr);
+            free(seasonStr);
+
             art.insert(make_pair(season, items[i]->GetPath()));
           }
         }

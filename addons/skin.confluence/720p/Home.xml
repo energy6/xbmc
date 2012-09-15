@@ -822,7 +822,7 @@
 						<textcolor>grey3</textcolor>
 						<align>center</align>
 						<aligny>center</aligny>
-						<label>[UPPERCASE]$INFO[ListItem.Label][/UPPERCASE]</label>
+						<label>$INFO[ListItem.Label]</label>
 					</control>
 				</itemlayout>
 				<focusedlayout height="60" width="300">
@@ -849,7 +849,7 @@
 						<textcolor>grey3</textcolor>
 						<align>center</align>
 						<aligny>center</aligny>
-						<label>[UPPERCASE]$INFO[ListItem.Label][/UPPERCASE]</label>
+						<label>$INFO[ListItem.Label]</label>
 					</control>
 					<control type="label">
 						<posx>150</posx>
@@ -860,7 +860,7 @@
 						<textcolor>blue</textcolor>
 						<align>center</align>
 						<aligny>center</aligny>
-						<label>[UPPERCASE]$INFO[ListItem.Label][/UPPERCASE]</label>
+						<label>$INFO[ListItem.Label]</label>
 						<visible>Control.HasFocus(9000)</visible>
 						<include>VisibleFadeEffect</include>
 					</control>
@@ -918,7 +918,8 @@
 					</item>
 					<item id="1">
 						<label>0</label>
-						<onclick>ActivateWindow(Programs,Addons,return)</onclick>
+						<onclick condition="!System.Platform.Android">ActivateWindow(Programs,Addons,return)</onclick>
+						<onclick condition="System.Platform.Android">ActivateWindow(Programs)</onclick>
 						<icon>-</icon>
 						<thumb>-</thumb>
 						<visible>!Skin.HasSetting(HomeMenuNoProgramsButton)</visible>

@@ -23,14 +23,6 @@
 #include <stdint.h>
 #include <list>
 
-#ifdef __GNUC__
-  #define S_PACK __attribute__((__packed__))
-  #define E_PACK
-#else
-  #define S_PACK __pragma(pack(push, 1))
-  #define E_PACK __pragma(pack(pop))
-#endif
-
 #define MAX_IEC61937_PACKET  61440
 #define IEC61937_DATA_OFFSET 8
 
@@ -52,12 +44,16 @@ public:
 
   static int PackAC3     (uint8_t *data, unsigned int size, uint8_t *dest);
   static int PackEAC3    (uint8_t *data, unsigned int size, uint8_t *dest);
-  static int PackDTS_512 (uint8_t *data, unsigned int size, uint8_t *dest);
-  static int PackDTS_1024(uint8_t *data, unsigned int size, uint8_t *dest);
-  static int PackDTS_2048(uint8_t *data, unsigned int size, uint8_t *dest);
+  static int PackDTS_512 (uint8_t *data, unsigned int size, uint8_t *dest, bool littleEndian);
+  static int PackDTS_1024(uint8_t *data, unsigned int size, uint8_t *dest, bool littleEndian);
+  static int PackDTS_2048(uint8_t *data, unsigned int size, uint8_t *dest, bool littleEndian);
   static int PackTrueHD  (uint8_t *data, unsigned int size, uint8_t *dest);
   static int PackDTSHD   (uint8_t *data, unsigned int size, uint8_t *dest, unsigned int period);
 private:
+
+  static int PackDTS(uint8_t *data, unsigned int size, uint8_t *dest, bool littleEndian,
+                     unsigned int frameSize, uint16_t type);
+
   enum IEC61937DataType
   {
     IEC61937_TYPE_NULL   = 0x00,
@@ -70,8 +66,12 @@ private:
     IEC61937_TYPE_TRUEHD = 0x16
   };
 
-  S_PACK
+#ifdef __GNUC__
+  struct __attribute__((__packed__)) IEC61937Packet
+#else
+  __pragma(pack(push, 1))
   struct IEC61937Packet
+#endif
   {
     uint16_t m_preamble1;
     uint16_t m_preamble2;
@@ -79,6 +79,8 @@ private:
     uint16_t m_length;
     uint8_t  m_data[MAX_IEC61937_PACKET - IEC61937_DATA_OFFSET];
   };
-  E_PACK
+#ifndef __GNUC__
+  __pragma(pack(pop))
+#endif
 };
 

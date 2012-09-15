@@ -21,6 +21,7 @@
  */
 
 #include "utils/ISerializable.h"
+#include "utils/ISortable.h"
 #include "utils/Archive.h"
 #include "DllLibExif.h"
 
@@ -34,6 +35,8 @@
 #define SLIDE_COLOUR                907
 #define SLIDE_PROCESS               908
 
+#define SLIDE_EXIF_DATE             919 /* Implementation only to just get
+                                           localized date */
 #define SLIDE_EXIF_DATE_TIME        920
 #define SLIDE_EXIF_DESCRIPTION      921
 #define SLIDE_EXIF_CAMERA_MAKE      922
@@ -81,13 +84,14 @@
 #define SLIDE_IPTC_COUNTRY_CODE     979
 #define SLIDE_IPTC_REF_SERVICE      980
 
-class CPictureInfoTag : public IArchivable, public ISerializable
+class CPictureInfoTag : public IArchivable, public ISerializable, public ISortable
 {
 public:
   CPictureInfoTag() { Reset(); };
   void Reset();
   virtual void Archive(CArchive& ar);
   virtual void Serialize(CVariant& value);
+  virtual void ToSortable(SortItem& sortable);
   const CPictureInfoTag& operator=(const CPictureInfoTag& item);
   const CStdString GetInfo(int info) const;
 

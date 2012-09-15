@@ -34,19 +34,17 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
-#if !defined(__APPLE__) && !defined(__FreeBSD__)
+#if !defined(TARGET_DARWIN) && !defined(__FreeBSD__)
 #include <linux/cdrom.h>
 #endif
 #endif
 #include "settings/AdvancedSettings.h"
 #include "GUIUserMessages.h"
 #include "utils/URIUtils.h"
-#include "pictures/Picture.h"
-#if defined (LIBCDIO_VERSION_NUM) && (LIBCDIO_VERSION_NUM > 77) || defined (__APPLE__)
+#if defined (LIBCDIO_VERSION_NUM) && (LIBCDIO_VERSION_NUM > 77) || defined (TARGET_DARWIN)
 #define USING_CDIO78
 #endif
 #include "guilib/GUIWindowManager.h"
-#include "filesystem/File.h"
 #include "FileItem.h"
 #include "Application.h"
 #include "IoSupport.h"
@@ -88,7 +86,7 @@ void CDetectDVDMedia::OnStartup()
 void CDetectDVDMedia::Process()
 {
 // for apple - currently disable this check since cdio will return null if no media is loaded
-#ifndef __APPLE__
+#if !defined(TARGET_DARWIN)
   //Before entering loop make sure we actually have a CDrom drive
   CdIo_t *p_cdio = m_cdio->cdio_open(NULL, DRIVER_DEVICE);
   if (p_cdio == NULL)
@@ -185,7 +183,7 @@ VOID CDetectDVDMedia::UpdateDvdrom()
         }
         break;
       case DRIVE_READY:
-#ifndef __APPLE__
+#if !defined(TARGET_DARWIN)
         return ;
 #endif
       case DRIVE_CLOSED_MEDIA_PRESENT:
@@ -312,30 +310,6 @@ void CDetectDVDMedia::SetNewDVDShareUrl( const CStdString& strNewUrl, bool bCDDA
   // store it in case others want it
   m_diskLabel = strDescription;
   m_diskPath = strNewUrl;
-
-  // delete any previously cached disc thumbnail
-  CStdString strCache = "special://temp/dvdicon.tbn";
-  if (CFile::Exists(strCache))
-    CFile::Delete(strCache);
-
-  // find and cache disc thumbnail
-  if (IsDiscInDrive() && !bCDDA)
-  {
-    CStdString strThumb;
-    CStdStringArray thumbs;
-    StringUtils::SplitString(g_advancedSettings.m_dvdThumbs, "|", thumbs);
-    for (unsigned int i = 0; i < thumbs.size(); ++i)
-    {
-      URIUtils::AddFileToFolder(m_diskPath, thumbs[i], strThumb);
-      CLog::Log(LOGDEBUG,"%s: looking for disc thumb:[%s]", __FUNCTION__, strThumb.c_str());
-      if (CFile::Exists(strThumb))
-      {
-        CLog::Log(LOGDEBUG,"%s: found disc thumb:[%s], caching as:[%s]", __FUNCTION__, strThumb.c_str(), strCache.c_str());
-        CPicture::CreateThumbnail(strThumb, strCache);
-        break;
-      }
-    }
-  }
 }
 
 DWORD CDetectDVDMedia::GetTrayState()

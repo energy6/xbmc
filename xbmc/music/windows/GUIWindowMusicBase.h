@@ -49,9 +49,9 @@ public:
   virtual bool OnBack(int actionID);
 
   void OnInfo(CFileItem *pItem, bool bShowInfo = false);
-  static void SetupFanart(CFileItemList& items);
 
 protected:
+  virtual void OnInitWindow();
   /*!
   \brief Will be called when an popup context menu has been asked for
   \param itemNumber List/thumb control item that has been clicked on

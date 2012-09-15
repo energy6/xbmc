@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2005-2010 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -36,7 +36,7 @@ namespace PVR
     virtual bool OnMessage(CGUIMessage& message);
     virtual void OnWindowLoaded();
     virtual void OnWindowUnload();
-    virtual void Notify(const Observable &obs, const CStdString& msg);
+    virtual void Notify(const Observable &obs, const ObservableMessage msg);
 
   protected:
     void CloseOrSelect(unsigned int iItem);

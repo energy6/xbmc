@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -53,6 +53,7 @@ namespace PVR
     int           m_iLifetime;      /*!< lifetime of this recording */
     CStdString    m_strStreamURL;   /*!< stream URL. if empty use pvr client */
     CStdString    m_strDirectory;   /*!< directory of this recording on the client */
+    int           m_iRecPlayCount;  /*!< play count of this recording on the client */
 
     CPVRRecording(void);
     CPVRRecording(const PVR_RECORDING &recording, unsigned int iClientId);
@@ -84,6 +85,13 @@ namespace PVR
      * @return True if it was renamed successfully, false otherwise.
      */
     bool Rename(const CStdString &strNewName);
+
+    /*!
+     * @brief Set this recording's play count on the client (if supported).
+     * @param count play count.
+     * @return True if play count was set successfully, false otherwise.
+     */
+    bool SetPlayCount(int count);
 
     /*!
      * @brief Update this tag with the contents of the given tag.

@@ -21,8 +21,6 @@
 
 #include "GUIDialogNetworkSetup.h"
 #include "guilib/GUISpinControlEx.h"
-#include "dialogs/GUIDialogNumeric.h"
-#include "dialogs/GUIDialogKeyboard.h"
 #include "dialogs/GUIDialogFileBrowser.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/GUIEditControl.h"
@@ -132,7 +130,9 @@ void CGUIDialogNetworkSetup::OnInitWindow()
 #endif
   pSpin->AddLabel(g_localizeStrings.Get(20256), NET_PROTOCOL_HTSP);
   pSpin->AddLabel(g_localizeStrings.Get(20257), NET_PROTOCOL_VTP);
+#ifdef HAS_MYSQL
   pSpin->AddLabel(g_localizeStrings.Get(20258), NET_PROTOCOL_MYTH);
+#endif
   pSpin->AddLabel(g_localizeStrings.Get(21331), NET_PROTOCOL_TUXBOX);
   pSpin->AddLabel(g_localizeStrings.Get(20301), NET_PROTOCOL_HTTPS);
   pSpin->AddLabel(g_localizeStrings.Get(20300), NET_PROTOCOL_HTTP);

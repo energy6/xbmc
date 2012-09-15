@@ -27,9 +27,7 @@
 #include "Application.h"
 #include "input/XBMC_vkeys.h"
 #include "input/MouseStat.h"
-#if defined(HAS_SDL_JOYSTICK)
-#include "input/SDLJoystick.h"
-#endif
+#include "input/windows/WINJoystick.h"
 #include "storage/MediaManager.h"
 #include "windowing/WindowingFactory.h"
 #include <dbt.h>
@@ -49,6 +47,8 @@
 #ifdef _WIN32
 
 using namespace PERIPHERALS;
+
+HWND g_hWnd = NULL;
 
 #define XBMC_arraysize(array)	(sizeof(array)/sizeof(array[0]))
 
@@ -365,6 +365,7 @@ LRESULT CALLBACK CWinEventsWin32::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
 
   if (uMsg == WM_CREATE)
   {
+    g_hWnd = hWnd;
     SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG)(((LPCREATESTRUCT)lParam)->lpCreateParams));
     DIB_InitOSKeymap();
     g_uQueryCancelAutoPlay = RegisterWindowMessage(TEXT("QueryCancelAutoPlay"));
@@ -375,6 +376,9 @@ LRESULT CALLBACK CWinEventsWin32::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
     RegisterDeviceInterfaceToHwnd(USB_HID_GUID, hWnd, &hDeviceNotify);
     return 0;
   }
+
+  if (uMsg == WM_DESTROY)
+    g_hWnd = NULL;
 
   m_pEventFunc = (PHANDLE_EVENT_FUNC)GetWindowLongPtr(hWnd, GWLP_USERDATA);
   if (!m_pEventFunc)
@@ -404,6 +408,9 @@ LRESULT CALLBACK CWinEventsWin32::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
       break;
     case WM_ACTIVATE:
       {
+        if( WA_INACTIVE != wParam )
+          g_Joystick.Acquire();
+
         bool active = g_application.m_AppActive;
         if (HIWORD(wParam))
         {
@@ -437,6 +444,14 @@ LRESULT CALLBACK CWinEventsWin32::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
         CStdString procfile;
         if (CWIN32Util::GetFocussedProcess(procfile))
           CLog::Log(LOGDEBUG, __FUNCTION__": Focus switched to process %s", procfile.c_str());
+      }
+      break;
+    case WM_SYSCOMMAND:
+      switch( wParam&0xFFF0 )
+      {
+        case SC_MONITORPOWER:
+        case SC_SCREENSAVE:
+          return 0;
       }
       break;
     case WM_SYSKEYDOWN:
@@ -629,9 +644,12 @@ LRESULT CALLBACK CWinEventsWin32::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
       return(0);
     case WM_MEDIA_CHANGE:
       {
-        // There may be multiple notifications for one event
-        // There are also a few events we're not interested in, but they cause no harm
-        // For example SD card reader insertion/removal
+        // This event detects media changes of usb, sd card and optical media.
+        // It only works if the explorer.exe process is started. Because this
+        // isn't the case for all setups we use WM_DEVICECHANGE for usb and 
+        // optical media because this event is also triggered without the 
+        // explorer process. Since WM_DEVICECHANGE doesn't detect sd card changes
+        // we still use this event only for sd.
         long lEvent;
         PIDLIST_ABSOLUTE *ppidl;
         HANDLE hLock = SHChangeNotification_Lock((HANDLE)wParam, (DWORD)lParam, &ppidl, &lEvent);
@@ -646,25 +664,20 @@ LRESULT CALLBACK CWinEventsWin32::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
           {
             case SHCNE_DRIVEADD:
             case SHCNE_MEDIAINSERTED:
-              CLog::Log(LOGDEBUG, __FUNCTION__": Drive %s Media has arrived.", drivePath);
-              if (GetDriveType(drivePath) == DRIVE_CDROM)
-                CJobManager::GetInstance().AddJob(new CDetectDisc(drivePath, true), NULL);
-              else
+              if (GetDriveType(drivePath) != DRIVE_CDROM)
+              {
+                CLog::Log(LOGDEBUG, __FUNCTION__": Drive %s Media has arrived.", drivePath);
                 CWin32StorageProvider::SetEvent();
+              }
               break;
 
             case SHCNE_DRIVEREMOVED:
             case SHCNE_MEDIAREMOVED:
-              CLog::Log(LOGDEBUG, __FUNCTION__": Drive %s Media was removed.", drivePath);
-              if (GetDriveType(drivePath) == DRIVE_CDROM)
+              if (GetDriveType(drivePath) != DRIVE_CDROM)
               {
-                CMediaSource share;
-                share.strPath = drivePath;
-                share.strName = share.strPath;
-                g_mediaManager.RemoveAutoSource(share);
-              }
-              else
+                CLog::Log(LOGDEBUG, __FUNCTION__": Drive %s Media was removed.", drivePath);
                 CWin32StorageProvider::SetEvent();
+              }
               break;
           }
           SHChangeNotification_Unlock(hLock);
@@ -695,9 +708,33 @@ LRESULT CALLBACK CWinEventsWin32::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
             if (((_DEV_BROADCAST_HEADER*) lParam)->dbcd_devicetype == DBT_DEVTYP_DEVICEINTERFACE)
             {
               g_peripherals.TriggerDeviceScan(PERIPHERAL_BUS_USB);
-#if defined(HAS_SDL_JOYSTICK)
               g_Joystick.Reinitialize();
-#endif
+            }
+            // check if an usb or optical media was inserted or removed
+            if (((_DEV_BROADCAST_HEADER*) lParam)->dbcd_devicetype == DBT_DEVTYP_VOLUME)
+            {
+              PDEV_BROADCAST_VOLUME lpdbv = (PDEV_BROADCAST_VOLUME)((_DEV_BROADCAST_HEADER*) lParam);
+              // optical medium
+              if (lpdbv -> dbcv_flags & DBTF_MEDIA)
+              {
+                CStdString strdrive;
+                strdrive.Format("%c:\\", CWIN32Util::FirstDriveFromMask(lpdbv ->dbcv_unitmask));
+                if(wParam == DBT_DEVICEARRIVAL)
+                {
+                  CLog::Log(LOGDEBUG, __FUNCTION__": Drive %s Media has arrived.", strdrive.c_str());
+                  CJobManager::GetInstance().AddJob(new CDetectDisc(strdrive, true), NULL);
+                }
+                else
+                {
+                  CLog::Log(LOGDEBUG, __FUNCTION__": Drive %s Media was removed.", strdrive.c_str());
+                  CMediaSource share;
+                  share.strPath = strdrive;
+                  share.strName = share.strPath;
+                  g_mediaManager.RemoveAutoSource(share);
+                }
+              }
+              else
+                CWin32StorageProvider::SetEvent();
             }
         }
         break;
@@ -725,7 +762,7 @@ void CWinEventsWin32::RegisterDeviceInterfaceToHwnd(GUID InterfaceClassGuid, HWN
   NotificationFilter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
   NotificationFilter.dbcc_classguid = InterfaceClassGuid;
 
-  *hDeviceNotify = RegisterDeviceNotification( 
+  *hDeviceNotify = RegisterDeviceNotification(
       hWnd,                       // events recipient
       &NotificationFilter,        // type of device
       DEVICE_NOTIFY_WINDOW_HANDLE // type of recipient handle
@@ -830,7 +867,8 @@ void CWinEventsWin32::OnGesture(HWND hWnd, LPARAM lParam)
     // You have encountered an unknown gesture
     break;
   }
-  g_Windowing.PtrCloseGestureInfoHandle((HGESTUREINFO)lParam);
+  if(g_Windowing.PtrCloseGestureInfoHandle)
+    g_Windowing.PtrCloseGestureInfoHandle((HGESTUREINFO)lParam);
 }
 
 #endif

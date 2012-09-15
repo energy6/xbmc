@@ -37,6 +37,8 @@
 #include "utils/URIUtils.h"
 #include "addons/AddonManager.h"
 #include "addons/Addon.h"
+#include "Application.h"
+#include "ApplicationMessenger.h"
 
 #include "XBPyThread.h"
 #include "XBPython.h"
@@ -54,6 +56,9 @@ extern "C" FILE *fopen_utf8(const char *_Filename, const char *_Mode);
 
 #define PY_PATH_SEP DELIM
 
+// Time before ill-behaved scripts are terminated
+#define PYTHON_SCRIPT_TIMEOUT 5000 // ms
+
 extern "C"
 {
   int xbp_chdir(const char *dirname);
@@ -70,6 +75,7 @@ XBPyThread::XBPyThread(XBPython *pExecuter, int id) : CThread("XBPyThread")
   m_argv        = NULL;
   m_source      = NULL;
   m_argc        = 0;
+  m_type        = 0;
 }
 
 XBPyThread::~XBPyThread()
@@ -343,7 +349,7 @@ void XBPyThread::Process()
     Py_XDECREF(exc_traceback); // already NULL'd out
     Py_XDECREF(pystring);
   }
-
+  
   PyObject *m = PyImport_AddModule((char*)"xbmc");
   if(!m || PyObject_SetAttrString(m, (char*)"abortRequested", PyBool_FromLong(1)))
     CLog::Log(LOGERROR, "Scriptresult: failed to set abortRequested");
@@ -379,7 +385,7 @@ void XBPyThread::Process()
   //this event has to be fired without holding m_pExecuter->m_critSection
   //before
   //Also the GIL (PyEval_AcquireLock) must not be held
-  //if not obeyed there is still no deadlock because ::stop waits with timeout (smart one!)
+  //if not obeyed there is still no deadlock because ::stop waits with timeout
   stoppedEvent.Set();
 
   { CSingleLock lock(m_pExecuter->m_critSection);
@@ -430,6 +436,10 @@ void XBPyThread::stop()
     PyEval_AcquireLock();
     PyThreadState* old = PyThreadState_Swap((PyThreadState*)m_threadState);
 
+    //tell xbmc.Monitor to call onAbortRequested()
+    if (addon)
+      g_pythonParser.OnAbortRequested(addon->ID());
+
     PyObject *m;
     m = PyImport_AddModule((char*)"xbmc");
     if(!m || PyObject_SetAttrString(m, (char*)"abortRequested", PyBool_FromLong(1)))
@@ -438,20 +448,39 @@ void XBPyThread::stop()
     PyThreadState_Swap(old);
     PyEval_ReleaseLock();
 
-    if(!stoppedEvent.WaitMSec(5000))//let the script 5 secs for shut stuff down
+    XbmcThreads::EndTime timeout(PYTHON_SCRIPT_TIMEOUT);
+    while (!stoppedEvent.WaitMSec(15))
     {
-      CLog::Log(LOGERROR, "XBPyThread::stop - script didn't stop in proper time - lets kill it");
+      if (timeout.IsTimePast())
+      {
+        CLog::Log(LOGERROR, "XBPyThread::stop - script didn't stop in %d seconds - let's kill it", PYTHON_SCRIPT_TIMEOUT / 1000);
+        break;
+      }
+      // We can't empty-spin in the main thread and expect scripts to be able to
+      // dismantle themselves. Python dialogs aren't normal XBMC dialogs, they rely
+      // on TMSG_GUI_PYTHON_DIALOG messages, so pump the message loop.
+      if (g_application.IsCurrentThread())
+      {
+        CSingleExit ex(g_graphicsContext);
+        CApplicationMessenger::Get().ProcessMessages();
+      }
     }
+    // Useful for add-on performance metrics
+    if (!timeout.IsTimePast())
+      CLog::Log(LOGDEBUG, "XBPyThread::stop - script termination took %dms", PYTHON_SCRIPT_TIMEOUT - timeout.MillisLeft());
     
     //everything which didn't exit by now gets killed
     PyEval_AcquireLock();
     old = PyThreadState_Swap((PyThreadState*)m_threadState);    
     for(PyThreadState* state = ((PyThreadState*)m_threadState)->interp->tstate_head; state; state = state->next)
     {
+      // Raise a SystemExit exception in python threads
       Py_XDECREF(state->async_exc);
       state->async_exc = PyExc_SystemExit;
       Py_XINCREF(state->async_exc);
     }
+    // If a dialog entered its doModal(), we need to wake it to see the exception
+    g_pythonParser.PulseGlobalEvent();
 
     PyThreadState_Swap(old);
     PyEval_ReleaseLock();

@@ -1,7 +1,7 @@
 #pragma once
 
 /*
- *      Copyright (C) 2005-2010 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -27,6 +27,8 @@
 #include "utils/Observer.h"
 #include "threads/CriticalSection.h"
 
+#include <boost/shared_ptr.hpp>
+
 namespace EPG
 {
   class CEpg;
@@ -34,63 +36,17 @@ namespace EPG
 
 namespace PVR
 {
-  class CPVRChannelGroup;
-  class CPVRChannelGroupInternal;
   class CPVRDatabase;
-  class CPVREpgContainer;
-  class CPVRChannelIconCacheJob;
+  class CPVRChannelGroupInternal;
+
+  class CPVRChannel;
+  typedef boost::shared_ptr<PVR::CPVRChannel> CPVRChannelPtr;
 
   /** PVR Channel class */
-
   class CPVRChannel : public Observable
   {
-    friend class CPVRChannelGroup;
-    friend class CPVRChannelGroupInternal;
     friend class CPVRDatabase;
-    friend class CPVREpgContainer;
-    friend class EPG::CEpg;
-    friend class CPVRChannelIconCacheJob;
-
-  private:
-    /*! @name XBMC related channel data
-     */
-    //@{
-    int              m_iChannelId;              /*!< the identifier given to this channel by the TV database */
-    bool             m_bIsRadio;                /*!< true if this channel is a radio channel, false if not */
-    bool             m_bIsHidden;               /*!< true if this channel is hidden, false if not */
-    bool             m_bIsUserSetIcon;          /*!< true if user set the icon via GUI, false if not */
-    CStdString       m_strIconPath;             /*!< the path to the icon for this channel */
-    CStdString       m_strChannelName;          /*!< the name for this channel used by XBMC */
-    bool             m_bIsVirtual;              /*!< true if this channel is marked as virtual, false if not */
-    time_t           m_iLastWatched;            /*!< last time channel has been watched */
-    bool             m_bChanged;                /*!< true if anything in this entry was changed that needs to be persisted */
-    unsigned int     m_iCachedChannelNumber;    /*!< the cached channel number in the selected group */
-    //@}
-
-    /*! @name EPG related channel data
-     */
-    //@{
-    int              m_iEpgId;                  /*!< the id of the EPG for this channel */
-    bool             m_bEPGCreated;             /*!< true if an EPG has been created for this channel */
-    bool             m_bEPGEnabled;             /*!< don't use an EPG for this channel if set to false */
-    CStdString       m_strEPGScraper;           /*!< the name of the scraper to be used for this channel */
-    //@}
-
-    /*! @name Client related channel data
-     */
-    //@{
-    int              m_iUniqueId;               /*!< the unique identifier for this channel */
-    int              m_iClientId;               /*!< the identifier of the client that serves this channel */
-    int              m_iClientChannelNumber;    /*!< the channel number on the client */
-    CStdString       m_strClientChannelName;    /*!< the name of this channel on the client */
-    CStdString       m_strInputFormat;          /*!< the stream input type based on ffmpeg/libavformat/allformats.c */
-    CStdString       m_strStreamURL;            /*!< URL of the stream. Use the client to read stream if this is empty */
-    CStdString       m_strFileNameAndPath;      /*!< the filename to be used by PVRManager to open and read the stream */
-    int              m_iClientEncryptionSystem; /*!< the encryption system used by this channel. 0 for FreeToAir, -1 for unknown */
-    CStdString       m_strClientEncryptionName; /*!< the name of the encryption system used by this channel */
-    //@}
-
-    CCriticalSection m_critSection;
+    friend class CPVRChannelGroupInternal;
 
   public:
     /*! @brief Create a new channel */
@@ -127,38 +83,36 @@ namespace PVR
     bool Persist(bool bQueueWrite = false);
 
     /*!
-     * @brief The identifier given to this channel by the TV database.
      * @return The identifier given to this channel by the TV database.
      */
-    int ChannelID(void) const { return m_iChannelId; }
+    int ChannelID(void) const;
 
-    bool IsNew(void) const { return m_iChannelId <= 0; }
+    /*!
+     * @return True when not persisted yet, false otherwise.
+     */
+    bool IsNew(void) const;
 
     /*!
      * @brief Set the identifier for this channel.
      * @param iDatabaseId The new channel ID
-     * @param bSaveInDb Save in the database or not.
      * @return True if the something changed, false otherwise.
      */
-    bool SetChannelID(int iDatabaseId, bool bSaveInDb = false);
+    bool SetChannelID(int iDatabaseId);
 
     /*!
-     * @brief The channel number used by XBMC by the currently active group.
-     * @return The channel number used by XBMC.
+     * @return The channel number used by XBMC by the currently active group.
      */
     int ChannelNumber(void) const;
 
     /*!
-     * @brief True if this channel is a radio channel, false if not.
      * @return True if this channel is a radio channel, false if not.
      */
     bool IsRadio(void) const { return m_bIsRadio; }
 
     /*!
-     * @brief True if this channel is hidden. False if not.
      * @return True if this channel is hidden. False if not.
      */
-    bool IsHidden(void) const { return m_bIsHidden; }
+    bool IsHidden(void) const;
 
     /*!
      * @brief Set to true to hide this channel. Set to false to unhide it.
@@ -166,79 +120,83 @@ namespace PVR
      * Set to true to hide this channel. Set to false to unhide it.
      * The EPG of hidden channels won't be updated.
      * @param bIsHidden The new setting.
-     * @param bSaveInDb Save in the database or not.
      * @return True if the something changed, false otherwise.
      */
-    bool SetHidden(bool bIsHidden, bool bSaveInDb = false);
+    bool SetHidden(bool bIsHidden);
 
     /*!
-     * @brief True if a recording is currently running on this channel. False if not.
+     * @return True if this channel is locked. False if not.
+     */
+    bool IsLocked(void) const;
+
+    /*!
+     * @brief Set to true to lock this channel. Set to false to unlock it.
+     *
+     * Set to true to lock this channel. Set to false to unlock it.
+     * Locked channels need can only be viewed if parental PIN entered.
+     * @param bIsLocked The new setting.
+     * @return True if the something changed, false otherwise.
+     */
+    bool SetLocked(bool bIsLocked);
+
+    /*!
      * @return True if a recording is currently running on this channel. False if not.
      */
     bool IsRecording(void) const;
 
     /*!
-     * @brief The path to the icon for this channel.
      * @return The path to the icon for this channel.
      */
-    const CStdString &IconPath(void) const { return m_strIconPath; }
+    CStdString IconPath(void) const;
 
     /*!
-     * @brief True if this user changed icon via GUI. False if not.
      * @return True if this user changed icon via GUI. False if not.
      */
-    bool IsUserSetIcon(void) const { return m_bIsUserSetIcon; }
+    bool IsUserSetIcon(void) const;
 	  
     /*!
      * @brief Set the path to the icon for this channel.
      * @param strIconPath The new path.
-     * @param bSaveInDb Save in the database or not.
      * @param bIsUserSetIcon true if user changed the icon via GUI, false otherwise.
      * @return True if the something changed, false otherwise.
      */
-    bool SetIconPath(const CStdString &strIconPath, bool bSaveInDb = false, bool bIsUserSetIcon = true);
+    bool SetIconPath(const CStdString &strIconPath, bool bIsUserSetIcon = false);
 
     /*!
-     * @brief The name for this channel used by XBMC.
      * @return The name for this channel used by XBMC.
      */
-    const CStdString &ChannelName(void) const { return m_strChannelName; }
+    CStdString ChannelName(void) const;
 
     /*!
      * @brief Set the name for this channel used by XBMC.
      * @param strChannelName The new channel name.
-     * @param bSaveInDb Save in the database or not.
      * @return True if the something changed, false otherwise.
      */
-    bool SetChannelName(const CStdString &strChannelName, bool bSaveInDb = false);
+    bool SetChannelName(const CStdString &strChannelName);
 
     /*!
-     * @brief True if this channel is marked as virtual. False if not.
      * @return True if this channel is marked as virtual. False if not.
      */
-    bool IsVirtual() const { return m_bIsVirtual; }
+    bool IsVirtual(void) const;
 
     /*!
      * @brief True if this channel is marked as virtual. False if not.
      * @param bIsVirtual The new value.
-     * @param bSaveInDb Save in the database or not.
      * @return True if the something changed, false otherwise.
      */
-    bool SetVirtual(bool bIsVirtual, bool bSaveInDb = false);
+    bool SetVirtual(bool bIsVirtual);
 
     /*!
-     * @brief Last time channel has been watched.
      * @return Time channel has been watched last.
      */
-    time_t LastWatched() const { return m_iLastWatched; }
+    time_t LastWatched() const;
 
     /*!
      * @brief Last time channel has been watched
      * @param iLastWatched The new value.
-     * @param bSaveInDb Save in the database or not.
      * @return True if the something changed, false otherwise.
      */
-    bool SetLastWatched(time_t iLastWatched, bool bSaveInDb = false);
+    bool SetLastWatched(time_t iLastWatched);
 
     /*!
      * @brief True if this channel has no file or stream name
@@ -246,7 +204,7 @@ namespace PVR
      */
     bool IsEmpty() const;
 
-    bool IsChanged() const { return m_bChanged; }
+    bool IsChanged() const;
     //@}
 
     /*! @name Client related channel methods
@@ -261,35 +219,31 @@ namespace PVR
      *
      * @return The Unique ID.
      */
-    int UniqueID(void) const { return m_iUniqueId; }
+    int UniqueID(void) const;
 
     /*!
      * @brief Change the unique identifier for this channel.
      * @param iUniqueId The new unique ID.
-     * @param bSaveInDb Save in the database or not.
      * @return True if the something changed, false otherwise.
      */
-    bool SetUniqueID(int iUniqueId, bool bSaveInDb = false);
+    bool SetUniqueID(int iUniqueId);
 
     /*!
-     * @brief The identifier of the client that serves this channel.
      * @return The identifier of the client that serves this channel.
      */
-    int ClientID(void) const { return m_iClientId; }
+    int ClientID(void) const;
 
     /*!
      * @brief Set the identifier of the client that serves this channel.
      * @param iClientId The new ID.
-     * @param bSaveInDb Save in the database or not.
      * @return True if the something changed, false otherwise.
      */
-    bool SetClientID(int iClientId, bool bSaveInDb = false);
+    bool SetClientID(int iClientId);
 
     /*!
-     * @brief The channel number on the client.
      * @return The channel number on the client.
      */
-    int ClientChannelNumber(void) const { return m_iClientChannelNumber; }
+    int ClientChannelNumber(void) const;
 
     /*!
      * @brief Set the channel number on the client.
@@ -298,16 +252,14 @@ namespace PVR
      * It will only be changed in this tag and won't change anything on the client.
      *
      * @param iClientChannelNumber The new channel number
-     * @param bSaveInDb Save in the database or not.
      * @return True if the something changed, false otherwise.
      */
-    bool SetClientChannelNumber(int iClientChannelNumber, bool bSaveInDb = false);
+    bool SetClientChannelNumber(int iClientChannelNumber);
 
     /*!
-     * @brief The name of this channel on the client.
      * @return The name of this channel on the client.
      */
-    const CStdString &ClientChannelName(void) const { return m_strClientChannelName; }
+    CStdString ClientChannelName(void) const;
 
     /*!
      * @brief Set the name of this channel on the client.
@@ -330,15 +282,14 @@ namespace PVR
      *
      * @return The stream input type
      */
-    const CStdString &InputFormat(void) const { return m_strInputFormat; }
+    CStdString InputFormat(void) const;
 
     /*!
      * @brief Set the stream input type
      * @param strInputFormat The new input format.
-     * @param bSaveInDb Save in the database or not.
      * @return True if the something changed, false otherwise.
      */
-    bool SetInputFormat(const CStdString &strInputFormat, bool bSaveInDb = false);
+    bool SetInputFormat(const CStdString &strInputFormat);
 
     /*!
      * @brief The stream URL to access this channel.
@@ -348,7 +299,7 @@ namespace PVR
      *
      * @return The stream URL to access this channel.
      */
-    const CStdString &StreamURL(void) const { return m_strStreamURL; }
+    CStdString StreamURL(void) const;
 
     /*!
      * @brief Set the stream URL to access this channel.
@@ -357,31 +308,23 @@ namespace PVR
      * If this is empty, then the client should be used to read from the channel.
      *
      * @param strStreamURL The new stream URL.
-     * @param bSaveInDb Save in the database or not.
      * @return True if the something changed, false otherwise.
      */
-    bool SetStreamURL(const CStdString &strStreamURL, bool bSaveInDb = false);
+    bool SetStreamURL(const CStdString &strStreamURL);
 
     /*!
      * @brief The path in the XBMC VFS to be used by PVRManager to open and read the stream.
      * @return The path in the XBMC VFS to be used by PVRManager to open and read the stream.
      */
-    const CStdString &Path(void) const { return m_strFileNameAndPath; }
+    CStdString Path(void) const;
 
-  private:
+    void ToSortable(SortItem& sortable) const;
+
     /*!
      * @brief Update the path after the channel number in the internal group changed.
      */
     void UpdatePath(unsigned int iNewChannelNumber);
 
-    /*!
-     * @brief Update the encryption name after SetEncryptionSystem() has been called.
-     */
-    void UpdateEncryptionName(void);
-
-    void SetCachedChannelNumber(unsigned int iChannelNumber);
-
-  public:
     /*!
      * @brief Return true if this channel is encrypted.
      *
@@ -390,7 +333,7 @@ namespace PVR
      *
      * @return Return true if this channel is encrypted.
      */
-    bool IsEncrypted(void) const { return m_iClientEncryptionSystem > 0; }
+    bool IsEncrypted(void) const;
 
 
     /*!
@@ -401,20 +344,19 @@ namespace PVR
      *
      * @return Return the encryption system ID for this channel.
      */
-    int EncryptionSystem(void) const { return m_iClientEncryptionSystem; }
+    int EncryptionSystem(void) const;
 
     /*!
      * @brief Set the encryption ID (CAID) for this channel.
      * @param iClientEncryptionSystem The new CAID.
-     * @param bSaveInDb Save in the database or not.
      * @return True if the something changed, false otherwise.
      */
-    bool SetEncryptionSystem(int iClientEncryptionSystem, bool bSaveInDb = false);
+    bool SetEncryptionSystem(int iClientEncryptionSystem);
 
     /*!
      * @return A friendly name for the used encryption system.
      */
-    const CStdString &EncryptionName() const { return m_strClientEncryptionName; }
+    CStdString EncryptionName(void) const;
     //@}
 
     /*! @name EPG methods
@@ -424,20 +366,13 @@ namespace PVR
     /*!
      * @return The ID of the EPG table to use for this channel or -1 if it isn't set.
      */
-    int EpgID() const { return m_iEpgId; };
+    int EpgID(void) const;
 
     /*!
      * @brief Get the EPG table for this channel.
      * @return The EPG for this channel.
      */
-    EPG::CEpg *GetEPG() const;
-
-    /*!
-     * @brief Create the EPG table for this channel.
-     * @brief bForce Create a table, even if it already has been created before.
-     * @return True if the table was created successfully, false otherwise.
-     */
-    bool CreateEPG(bool bForce = false);
+    EPG::CEpg *GetEPG(void) const;
 
     /*!
      * @brief Get the EPG table for this channel.
@@ -450,7 +385,7 @@ namespace PVR
      * @brief Clear the EPG for this channel.
      * @return True if it was cleared, false if not.
      */
-    bool ClearEPG() const;
+    bool ClearEPG(void) const;
 
     /*!
      * @brief Get the EPG tag that is active on this channel now.
@@ -473,18 +408,16 @@ namespace PVR
     bool GetEPGNext(EPG::CEpgInfoTag &tag) const;
 
     /*!
-     * @brief Don't use an EPG for this channel if set to false.
      * @return Don't use an EPG for this channel if set to false.
      */
-    bool EPGEnabled() const { return m_bEPGEnabled; }
+    bool EPGEnabled(void) const;
 
     /*!
      * @brief Set to true if an EPG should be used for this channel. Set to false otherwise.
      * @param bEPGEnabled The new value.
-     * @param bSaveInDb Save in the database or not.
      * @return True if the something changed, false otherwise.
      */
-    bool SetEPGEnabled(bool bEPGEnabled = true, bool bSaveInDb = false);
+    bool SetEPGEnabled(bool bEPGEnabled);
 
     /*!
      * @brief Get the name of the scraper to be used for this channel.
@@ -494,7 +427,7 @@ namespace PVR
      *
      * @return The name of the scraper to be used for this channel.
      */
-    const CStdString &EPGScraper(void) const { return m_strEPGScraper; }
+    CStdString EPGScraper(void) const;
 
     /*!
      * @brief Set the name of the scraper to be used for this channel.
@@ -503,11 +436,59 @@ namespace PVR
      * Set to "client" to load the EPG from the backend
      *
      * @param strScraper The new scraper name.
-     * @param bSaveInDb Save in the database or not.
      * @return True if the something changed, false otherwise.
      */
-    bool SetEPGScraper(const CStdString &strScraper, bool bSaveInDb = false);
+    bool SetEPGScraper(const CStdString &strScraper);
 
+    void SetCachedChannelNumber(unsigned int iChannelNumber);
+
+    bool CanRecord(void) const;
     //@}
+  private:
+    /*!
+     * @brief Update the encryption name after SetEncryptionSystem() has been called.
+     */
+    void UpdateEncryptionName(void);
+
+    /*! @name XBMC related channel data
+     */
+    //@{
+    int              m_iChannelId;              /*!< the identifier given to this channel by the TV database */
+    bool             m_bIsRadio;                /*!< true if this channel is a radio channel, false if not */
+    bool             m_bIsHidden;               /*!< true if this channel is hidden, false if not */
+    bool             m_bIsUserSetIcon;          /*!< true if user set the icon via GUI, false if not */
+    bool             m_bIsLocked;               /*!< true if channel is locked, false if not */
+    CStdString       m_strIconPath;             /*!< the path to the icon for this channel */
+    CStdString       m_strChannelName;          /*!< the name for this channel used by XBMC */
+    bool             m_bIsVirtual;              /*!< true if this channel is marked as virtual, false if not */
+    time_t           m_iLastWatched;            /*!< last time channel has been watched */
+    bool             m_bChanged;                /*!< true if anything in this entry was changed that needs to be persisted */
+    unsigned int     m_iCachedChannelNumber;    /*!< the cached channel number in the selected group */
+    //@}
+
+    /*! @name EPG related channel data
+     */
+    //@{
+    int              m_iEpgId;                  /*!< the id of the EPG for this channel */
+    bool             m_bEPGCreated;             /*!< true if an EPG has been created for this channel */
+    bool             m_bEPGEnabled;             /*!< don't use an EPG for this channel if set to false */
+    CStdString       m_strEPGScraper;           /*!< the name of the scraper to be used for this channel */
+    //@}
+
+    /*! @name Client related channel data
+     */
+    //@{
+    int              m_iUniqueId;               /*!< the unique identifier for this channel */
+    int              m_iClientId;               /*!< the identifier of the client that serves this channel */
+    int              m_iClientChannelNumber;    /*!< the channel number on the client */
+    CStdString       m_strClientChannelName;    /*!< the name of this channel on the client */
+    CStdString       m_strInputFormat;          /*!< the stream input type based on ffmpeg/libavformat/allformats.c */
+    CStdString       m_strStreamURL;            /*!< URL of the stream. Use the client to read stream if this is empty */
+    CStdString       m_strFileNameAndPath;      /*!< the filename to be used by PVRManager to open and read the stream */
+    int              m_iClientEncryptionSystem; /*!< the encryption system used by this channel. 0 for FreeToAir, -1 for unknown */
+    CStdString       m_strClientEncryptionName; /*!< the name of the encryption system used by this channel */
+    //@}
+
+    CCriticalSection m_critSection;
   };
 }

@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -56,7 +56,7 @@ CAddonCallbacks::~CAddonCallbacks()
   m_helperGUI = NULL;
   delete m_helperPVR;
   m_helperPVR = NULL;
-  delete m_callbacks->libBasePath;
+  free((char*)m_callbacks->libBasePath);
   delete m_callbacks;
   m_callbacks = NULL;
 }

@@ -211,7 +211,7 @@ bool CWinRenderer::UpdateRenderMethod()
   return true;
 }
 
-bool CWinRenderer::Configure(unsigned int width, unsigned int height, unsigned int d_width, unsigned int d_height, float fps, unsigned flags, ERenderFormat format, unsigned extended_format)
+bool CWinRenderer::Configure(unsigned int width, unsigned int height, unsigned int d_width, unsigned int d_height, float fps, unsigned flags, ERenderFormat format, unsigned extended_format, unsigned int orientation)
 {
   if(m_sourceWidth  != width
   || m_sourceHeight != height)
@@ -927,7 +927,10 @@ bool CWinRenderer::RenderCapture(CRenderCapture* capture)
   LPDIRECT3DDEVICE9 pD3DDevice = g_Windowing.Get3DDevice();
 
   CRect saveSize = m_destRect;
+  saveRotatedCoords();//backup current m_rotatedDestCoords
+
   m_destRect.SetRect(0, 0, (float)capture->GetWidth(), (float)capture->GetHeight());
+  syncDestRectToRotatedPoints();//syncs the changed destRect to m_rotatedDestCoords
 
   LPDIRECT3DSURFACE9 oldSurface;
   pD3DDevice->GetRenderTarget(0, &oldSurface);
@@ -946,6 +949,7 @@ bool CWinRenderer::RenderCapture(CRenderCapture* capture)
   oldSurface->Release();
 
   m_destRect = saveSize;
+  restoreRotatedCoords();//restores the previous state of the rotated dest coords
 
   return succeeded;
 }

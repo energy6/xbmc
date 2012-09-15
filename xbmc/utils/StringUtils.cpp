@@ -33,7 +33,6 @@
 #include "StringUtils.h"
 #include "utils/RegExp.h"
 #include "utils/fstrcmp.h"
-#include "LangInfo.h"
 #include <locale>
 
 #include <math.h>
@@ -295,13 +294,13 @@ bool StringUtils::IsNaturalNumber(const CStdString& str)
 {
   size_t i = 0, n = 0;
   // allow whitespace,digits,whitespace
-  while (i < str.size() && isspace(str[i]))
+  while (i < str.size() && isspace((unsigned char) str[i]))
     i++;
-  while (i < str.size() && isdigit(str[i]))
+  while (i < str.size() && isdigit((unsigned char) str[i]))
   {
     i++; n++;
   }
-  while (i < str.size() && isspace(str[i]))
+  while (i < str.size() && isspace((unsigned char) str[i]))
     i++;
   return i == str.size() && n > 0;
 }
@@ -310,15 +309,15 @@ bool StringUtils::IsInteger(const CStdString& str)
 {
   size_t i = 0, n = 0;
   // allow whitespace,-,digits,whitespace
-  while (i < str.size() && isspace(str[i]))
+  while (i < str.size() && isspace((unsigned char) str[i]))
     i++;
   if (i < str.size() && str[i] == '-')
     i++;
-  while (i < str.size() && isdigit(str[i]))
+  while (i < str.size() && isdigit((unsigned char) str[i]))
   {
     i++; n++;
   }
-  while (i < str.size() && isspace(str[i]))
+  while (i < str.size() && isspace((unsigned char) str[i]))
     i++;
   return i == str.size() && n > 0;
 }
@@ -338,6 +337,7 @@ bool StringUtils::Test()
   ret |= !IsNaturalNumber("120 h");
   ret |= !IsNaturalNumber(" ");
   ret |= !IsNaturalNumber("");
+  ret |= !IsNaturalNumber("ייטט");
 
   ret |= IsInteger("10");
   ret |= IsInteger(" -10");
@@ -350,6 +350,7 @@ bool StringUtils::Test()
   ret |= !IsInteger("120 h");
   ret |= !IsInteger(" ");
   ret |= !IsInteger("");
+  ret |= !IsInteger("ייטט");
 
   return ret;
 }

@@ -64,16 +64,26 @@ static const uint32_t DTSSampleRates[DTS_SFREQ_COUNT] =
 };
 
 CAEStreamInfo::CAEStreamInfo() :
-  m_bufferSize(0),
-  m_skipBytes (0),
-  m_coreOnly  (false),
-  m_needBytes (0),
-  m_syncFunc  (&CAEStreamInfo::DetectType),
-  m_hasSync   (false),
-  m_sampleRate(0),
-  m_dtsBlocks (0),
-  m_dataType  (STREAM_TYPE_NULL),
-  m_packFunc  (NULL)
+  m_bufferSize    (0),
+  m_skipBytes     (0),
+  m_coreOnly      (false),
+  m_needBytes     (0),
+  m_syncFunc      (&CAEStreamInfo::DetectType),
+  m_hasSync       (false),
+  m_sampleRate    (0),
+  m_outputRate    (0),
+  m_outputChannels(0),
+  m_channelMap    (CAEChannelInfo()),
+  m_channels      (0),
+  m_coreSize      (0),
+  m_dtsBlocks     (0),
+  m_dtsPeriod     (0),
+  m_fsize         (0),
+  m_repeat        (0),
+  m_substreams    (0),
+  m_dataType      (STREAM_TYPE_NULL),
+  m_dataIsLE      (false),
+  m_packFunc      (NULL)
 {
   m_dllAvUtil.Load();
   m_dllAvUtil.av_crc_init(m_crcTrueHD, 0, 16, 0x2D, sizeof(m_crcTrueHD));
@@ -504,9 +514,9 @@ unsigned int CAEStreamInfo::SyncDTS(uint8_t *data, unsigned int size)
     DataType dataType;
     switch (dtsBlocks << 5)
     {
-      case 512 : dataType = STREAM_TYPE_DTS_512 ; m_packFunc = &CAEPackIEC61937::PackDTS_512 ; break;
-      case 1024: dataType = STREAM_TYPE_DTS_1024; m_packFunc = &CAEPackIEC61937::PackDTS_1024; break;
-      case 2048: dataType = STREAM_TYPE_DTS_2048; m_packFunc = &CAEPackIEC61937::PackDTS_2048; break;
+      case 512 : dataType = STREAM_TYPE_DTS_512 ; break;
+      case 1024: dataType = STREAM_TYPE_DTS_1024; break;
+      case 2048: dataType = STREAM_TYPE_DTS_2048; break;
       default:
         invalid = true;
         break;

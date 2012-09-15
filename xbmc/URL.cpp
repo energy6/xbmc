@@ -97,9 +97,14 @@ void CURL::Parse(const CStdString& strURL1)
     // example: filename /foo/bar.zip/alice.rar/bob.avi
     // This should turn into zip://rar:///foo/bar.zip/alice.rar/bob.avi
     iPos = 0;
+    bool is_apk = (strURL.Find(".apk/", iPos) > 0);
     while (1)
     {
-      iPos = strURL.Find(".zip/", iPos);
+      if (is_apk)
+        iPos = strURL.Find(".apk/", iPos);
+      else
+        iPos = strURL.Find(".zip/", iPos);
+
       int extLen = 3;
       if (iPos < 0)
       {
@@ -119,8 +124,16 @@ void CURL::Parse(const CStdString& strURL1)
 #endif
         {
           Encode(archiveName);
-          CURL c((CStdString)"zip" + "://" + archiveName + '/' + strURL.Right(strURL.size() - iPos - 1));
-          *this = c;
+          if (is_apk)
+          {
+            CURL c((CStdString)"apk" + "://" + archiveName + '/' + strURL.Right(strURL.size() - iPos - 1));
+            *this = c;
+          }
+          else
+          {
+            CURL c((CStdString)"zip" + "://" + archiveName + '/' + strURL.Right(strURL.size() - iPos - 1));
+            *this = c;
+          }
           return;
         }
       }
@@ -162,15 +175,19 @@ void CURL::Parse(const CStdString& strURL1)
   if(m_strProtocol.Equals("rss") ||
      m_strProtocol.Equals("rar") ||
      m_strProtocol.Equals("addons") ||
-     m_strProtocol.Equals("image"))
+     m_strProtocol.Equals("image") ||
+     m_strProtocol.Equals("videodb") ||
+     m_strProtocol.Equals("musicdb") ||
+     m_strProtocol.Equals("androidapp"))
     sep = "?";
   else
   if(strProtocol2.Equals("http")
     || strProtocol2.Equals("https")
     || strProtocol2.Equals("plugin")
-    || m_strProtocol.Equals("addon")
+    || strProtocol2.Equals("addons")
     || strProtocol2.Equals("hdhomerun")
     || strProtocol2.Equals("rtsp")
+    || strProtocol2.Equals("apk")
     || strProtocol2.Equals("zip"))
     sep = "?;#|";
   else if(strProtocol2.Equals("ftp")
@@ -436,22 +453,7 @@ const CStdString& CURL::GetProtocol() const
 
 const CStdString CURL::GetTranslatedProtocol() const
 {
-  if (m_strProtocol == "ftpx")
-    return "ftp";
-
-  if (m_strProtocol == "shout"
-   || m_strProtocol == "daap"
-   || m_strProtocol == "dav"
-   || m_strProtocol == "tuxbox"
-   || m_strProtocol == "lastfm"
-   || m_strProtocol == "mms"
-   || m_strProtocol == "rss")
-   return "http";
-  
-  if (m_strProtocol == "davs")
-    return "https";
-  
-  return m_strProtocol;
+  return TranslateProtocol(m_strProtocol);
 }
 
 const CStdString& CURL::GetFileType() const
@@ -472,7 +474,10 @@ const CStdString& CURL::GetProtocolOptions() const
 const CStdString CURL::GetFileNameWithoutPath() const
 {
   // *.zip and *.rar store the actual zip/rar path in the hostname of the url
-  if ((m_strProtocol == "rar" || m_strProtocol == "zip") && m_strFileName.IsEmpty())
+  if ((m_strProtocol == "rar"  || 
+       m_strProtocol == "zip"  ||
+       m_strProtocol == "apk") &&
+       m_strFileName.IsEmpty())
     return URIUtils::GetFileName(m_strHostName);
 
   // otherwise, we've already got the filepath, so just grab the filename portion
@@ -710,8 +715,11 @@ void CURL::Encode(CStdString& strURLData)
   for (int i = 0; i < (int)strURLData.size(); ++i)
   {
     int kar = (unsigned char)strURLData[i];
-    //if (kar == ' ') strResult += '+';
-    if (isalnum(kar)) strResult += kar;
+    //if (kar == ' ') strResult += '+'; // obsolete
+    if (isalnum(kar) || strchr("-_.!()" , kar) ) // Don't URL encode these according to RFC1738
+    {
+      strResult += kar;
+    }
     else
     {
       CStdString strTmp;
@@ -721,3 +729,34 @@ void CURL::Encode(CStdString& strURLData)
   }
   strURLData = strResult;
 }
+
+std::string CURL::Decode(const std::string& strURLData)
+{
+  CStdString url = strURLData;
+  Decode(url);
+  return url;
+}
+
+std::string CURL::Encode(const std::string& strURLData)
+{
+  CStdString url = strURLData;
+  Encode(url);
+  return url;
+}
+
+CStdString CURL::TranslateProtocol(const CStdString& prot)
+{
+  if (prot == "shout"
+   || prot == "daap"
+   || prot == "dav"
+   || prot == "tuxbox"
+   || prot == "lastfm"
+   || prot == "rss")
+   return "http";
+
+  if (prot == "davs")
+    return "https";
+
+  return prot;
+}
+

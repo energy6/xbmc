@@ -59,13 +59,17 @@ CRenderSystemGLES::~CRenderSystemGLES()
 
 bool CRenderSystemGLES::InitRenderSystem()
 {
+  GLint maxTextureSize;
+
+  glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
+
+  m_maxTextureSize = maxTextureSize;
   m_bVSync = false;
   m_iVSyncMode = 0;
   m_iSwapStamp = 0;
   m_iSwapTime = 0;
   m_iSwapRate = 0;
   m_bVsyncInit = false;
-  m_maxTextureSize = 2048;
   m_renderCaps = 0;
   // Get the GLES version number
   m_RenderVersionMajor = 0;
@@ -369,6 +373,7 @@ void CRenderSystemGLES::ApplyStateBlock()
   glActiveTexture(GL_TEXTURE0);
   glEnable(GL_BLEND);
   glEnable(GL_SCISSOR_TEST);  
+  glClear(GL_DEPTH_BUFFER_BIT);
 }
 
 void CRenderSystemGLES::SetCameraPosition(const CPoint &camera, int screenWidth, int screenHeight)

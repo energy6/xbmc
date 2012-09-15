@@ -31,6 +31,7 @@
 #include "utils/log.h"
 #include "utils/TimeUtils.h"
 #include "utils/MathUtils.h"
+#include "cores/AudioEngine/AEFactory.h"
 #include "cores/AudioEngine/Utils/AEUtil.h"
 
 #include <sstream>
@@ -166,8 +167,20 @@ CDVDPlayerAudio::CDVDPlayerAudio(CDVDClock* pClock, CDVDMessageQueue& parent)
   m_speed = DVD_PLAYSPEED_NORMAL;
   m_stalled = true;
   m_started = false;
+  m_silence = false;
   m_duration = 0.0;
   m_resampleratio = 1.0;
+  m_synctype = SYNC_DISCON;
+  m_setsynctype = SYNC_DISCON;
+  m_prevsynctype = -1;
+  m_error = 0;
+  m_errorbuff = 0;
+  m_errorcount = 0;
+  m_syncclock = true;
+  m_integral = 0;
+  m_skipdupcount = 0;
+  m_prevskipped = false;
+  m_maxspeedadjust = 0.0;
 
   m_freq = CurrentHostFrequency();
 
@@ -232,7 +245,9 @@ void CDVDPlayerAudio::OpenStream( CDVDStreamInfo &hints, CDVDAudioCodec* codec )
   m_started = false;
 
   m_synctype = SYNC_DISCON;
-  m_setsynctype = g_guiSettings.GetInt("videoplayer.synctype");
+  m_setsynctype = SYNC_DISCON;
+  if (g_guiSettings.GetBool("videoplayer.usedisplayasclock"))
+    m_setsynctype = g_guiSettings.GetInt("videoplayer.synctype");
   m_prevsynctype = -1;
 
   m_error = 0;
@@ -250,8 +265,10 @@ void CDVDPlayerAudio::OpenStream( CDVDStreamInfo &hints, CDVDAudioCodec* codec )
 
 void CDVDPlayerAudio::CloseStream(bool bWaitForBuffers)
 {
+  bool bWait = bWaitForBuffers && m_speed > 0 && !CAEFactory::IsSuspended();
+
   // wait until buffers are empty
-  if (bWaitForBuffers && m_speed > 0) m_messageQueue.WaitUntilEmpty();
+  if (bWait) m_messageQueue.WaitUntilEmpty();
 
   // send abort message to the audio queue
   m_messageQueue.Abort();
@@ -263,7 +280,7 @@ void CDVDPlayerAudio::CloseStream(bool bWaitForBuffers)
 
   // destroy audio device
   CLog::Log(LOGNOTICE, "Closing audio device");
-  if (bWaitForBuffers && m_speed > 0)
+  if (bWait)
   {
     m_bStop = false;
     m_dvdAudio.Drain();
@@ -419,8 +436,10 @@ int CDVDPlayerAudio::DecodeFrame(DVDAudioFrame &audioframe, bool bDropPacket)
     }
     else if (pMsg->IsType(CDVDMsg::GENERAL_SYNCHRONIZE))
     {
-      ((CDVDMsgGeneralSynchronize*)pMsg)->Wait( &m_bStop, SYNCSOURCE_AUDIO );
-      CLog::Log(LOGDEBUG, "CDVDPlayerAudio - CDVDMsg::GENERAL_SYNCHRONIZE");
+      if(((CDVDMsgGeneralSynchronize*)pMsg)->Wait( 100, SYNCSOURCE_AUDIO ))
+        CLog::Log(LOGDEBUG, "CDVDPlayerAudio - CDVDMsg::GENERAL_SYNCHRONIZE");
+      else
+        m_messageQueue.Put(pMsg->Acquire(), 1); /* push back as prio message, to process other prio messages */
     }
     else if (pMsg->IsType(CDVDMsg::GENERAL_RESYNC))
     { //player asked us to set internal clock
@@ -429,6 +448,8 @@ int CDVDPlayerAudio::DecodeFrame(DVDAudioFrame &audioframe, bool bDropPacket)
       if (pMsgGeneralResync->m_timestamp != DVD_NOPTS_VALUE)
         m_audioClock = pMsgGeneralResync->m_timestamp;
 
+      m_ptsInput.Flush();
+      m_ptsOutput.Flush();
       m_ptsOutput.Add(m_audioClock, m_dvdAudio.GetDelay(), 0);
       if (pMsgGeneralResync->m_clock)
       {
@@ -523,7 +544,6 @@ int CDVDPlayerAudio::DecodeFrame(DVDAudioFrame &audioframe, bool bDropPacket)
 
 void CDVDPlayerAudio::OnStartup()
 {
-  m_decode.msg = NULL;
   m_decode.Release();
 
   g_dvdPerformanceCounter.EnableAudioDecodePerformance(this);
@@ -546,7 +566,8 @@ void CDVDPlayerAudio::Process()
   while (!m_bStop)
   {
     //Don't let anybody mess with our global variables
-    result = DecodeFrame(audioframe, m_speed > DVD_PLAYSPEED_NORMAL || m_speed < 0); // blocks if no audio is available, but leaves critical section before doing so
+    result = DecodeFrame(audioframe, m_speed > DVD_PLAYSPEED_NORMAL || m_speed < 0 ||
+                         CAEFactory::IsSuspended()); // blocks if no audio is available, but leaves critical section before doing so
 
     if( result & DECODE_FLAG_ERROR )
     {
@@ -898,7 +919,7 @@ string CDVDPlayerAudio::GetPlayerInfo()
 {
   std::ostringstream s;
   s << "aq:"     << setw(2) << min(99,m_messageQueue.GetLevel() + MathUtils::round_int(100.0/8.0*m_dvdAudio.GetCacheTime())) << "%";
-  s << ", kB/s:" << fixed << setprecision(2) << (double)GetAudioBitrate() / 1024.0;
+  s << ", Kb/s:" << fixed << setprecision(2) << (double)GetAudioBitrate() / 1024.0;
 
   //print the inverse of the resample ratio, since that makes more sense
   //if the resample ratio is 0.5, then we're playing twice as fast

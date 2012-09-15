@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2005-2010 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -45,7 +45,7 @@ namespace PVR
   protected:
     void Update();
     bool ActionStartTimer(const EPG::CEpgInfoTag *tag);
-    bool ActionCancelTimer(const CPVRTimerInfoTag *tag);
+    bool ActionCancelTimer(CFileItemPtr timer);
 
     bool OnClickButtonOK(CGUIMessage &message);
     bool OnClickButtonRecord(CGUIMessage &message);

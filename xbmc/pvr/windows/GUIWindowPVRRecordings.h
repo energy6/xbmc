@@ -1,7 +1,7 @@
 #pragma once
 
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -38,24 +38,24 @@ namespace PVR
 
     static CStdString GetResumeString(CFileItem item);
 
-    virtual void GetContextButtons(int itemNumber, CContextButtons &buttons) const;
-    virtual bool OnAction(const CAction &action);
-    virtual bool OnContextButton(int itemNumber, CONTEXT_BUTTON button);
-    virtual void OnWindowUnload(void);
-    virtual void UpdateData(void);
-    virtual void Notify(const Observable &obs, const CStdString& msg);
-    virtual void UnregisterObservers(void);
-    virtual void ResetObservers(void);
+    void GetContextButtons(int itemNumber, CContextButtons &buttons) const;
+    bool OnAction(const CAction &action);
+    bool OnContextButton(int itemNumber, CONTEXT_BUTTON button);
+    void OnWindowUnload(void);
+    void UpdateData(bool bUpdateSelectedFile = true);
+    void Notify(const Observable &obs, const ObservableMessage msg);
+    void UnregisterObservers(void);
+    void ResetObservers(void);
 
   private:
+    bool OnClickButton(CGUIMessage &message);
+    bool OnClickList(CGUIMessage &message);
 
-    virtual bool OnClickButton(CGUIMessage &message);
-    virtual bool OnClickList(CGUIMessage &message);
-
-    virtual bool OnContextButtonDelete(CFileItem *item, CONTEXT_BUTTON button);
-    virtual bool OnContextButtonInfo(CFileItem *item, CONTEXT_BUTTON button);
-    virtual bool OnContextButtonPlay(CFileItem *item, CONTEXT_BUTTON button);
-    virtual bool OnContextButtonRename(CFileItem *item, CONTEXT_BUTTON button);
+    bool OnContextButtonDelete(CFileItem *item, CONTEXT_BUTTON button);
+    bool OnContextButtonInfo(CFileItem *item, CONTEXT_BUTTON button);
+    bool OnContextButtonPlay(CFileItem *item, CONTEXT_BUTTON button);
+    bool OnContextButtonRename(CFileItem *item, CONTEXT_BUTTON button);
+    bool OnContextButtonMarkWatched(const CFileItemPtr &item, CONTEXT_BUTTON button);
 
     CStdString m_strSelectedPath;
   };

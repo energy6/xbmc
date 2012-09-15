@@ -21,11 +21,13 @@
 #include "AddonStatusHandler.h"
 #include "AddonManager.h"
 #include "threads/SingleLock.h"
-#include "Application.h"
+#include "ApplicationMessenger.h"
 #include "guilib/GUIWindowManager.h"
 #include "GUIDialogAddonSettings.h"
 #include "dialogs/GUIDialogYesNo.h"
 #include "dialogs/GUIDialogOK.h"
+#include "dialogs/GUIDialogKaiToast.h"
+#include "settings/GUISettings.h"
 #include "utils/log.h"
 
 namespace ADDON
@@ -84,21 +86,30 @@ void CAddonStatusHandler::Process()
   heading.Format("%s: %s", TranslateType(m_addon->Type(), true).c_str(), m_addon->Name().c_str());
 
   /* AddOn lost connection to his backend (for ones that use Network) */
-  if (m_status == ADDON_STATUS_LOST_CONNECTION && m_addon->Type() != ADDON_PVRDLL) // TODO display a proper message for pvr addons, but don't popup a dialog that requires user action
+  if (m_status == ADDON_STATUS_LOST_CONNECTION)
   {
-    CGUIDialogYesNo* pDialog = (CGUIDialogYesNo*)g_windowManager.GetWindow(WINDOW_DIALOG_YES_NO);
-    if (!pDialog) return;
+    if (m_addon->Type() == ADDON_PVRDLL)
+    {
+      if (!g_guiSettings.GetBool("pvrmanager.hideconnectionlostwarning"))
+        CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info, m_addon->Name().c_str(), g_localizeStrings.Get(36030)); // connection lost
+      // TODO handle disconnects after the add-on's been initialised
+    }
+    else
+    {
+      CGUIDialogYesNo* pDialog = (CGUIDialogYesNo*)g_windowManager.GetWindow(WINDOW_DIALOG_YES_NO);
+      if (!pDialog) return;
 
-    pDialog->SetHeading(heading);
-    pDialog->SetLine(1, 24070);
-    pDialog->SetLine(2, 24073);
+      pDialog->SetHeading(heading);
+      pDialog->SetLine(1, 24070);
+      pDialog->SetLine(2, 24073);
 
-    //send message and wait for user input
-    ThreadMessage tMsg = {TMSG_DIALOG_DOMODAL, WINDOW_DIALOG_YES_NO, g_windowManager.GetActiveWindow()};
-    g_application.getApplicationMessenger().SendMessage(tMsg, true);
+      //send message and wait for user input
+      ThreadMessage tMsg = {TMSG_DIALOG_DOMODAL, WINDOW_DIALOG_YES_NO, g_windowManager.GetActiveWindow()};
+      CApplicationMessenger::Get().SendMessage(tMsg, true);
 
-    if (pDialog->IsConfirmed())
-      CAddonMgr::Get().GetCallbackForType(m_addon->Type())->RequestRestart(m_addon, false);
+      if (pDialog->IsConfirmed())
+        CAddonMgr::Get().GetCallbackForType(m_addon->Type())->RequestRestart(m_addon, false);
+    }
   }
   /* Request to restart the AddOn and data structures need updated */
   else if (m_status == ADDON_STATUS_NEED_RESTART)
@@ -111,7 +122,7 @@ void CAddonStatusHandler::Process()
 
     //send message and wait for user input
     ThreadMessage tMsg = {TMSG_DIALOG_DOMODAL, WINDOW_DIALOG_OK, g_windowManager.GetActiveWindow()};
-    g_application.getApplicationMessenger().SendMessage(tMsg, true);
+    CApplicationMessenger::Get().SendMessage(tMsg, true);
 
     CAddonMgr::Get().GetCallbackForType(m_addon->Type())->RequestRestart(m_addon, true);
   }
@@ -128,7 +139,7 @@ void CAddonStatusHandler::Process()
 
     //send message and wait for user input
     ThreadMessage tMsg = {TMSG_DIALOG_DOMODAL, WINDOW_DIALOG_YES_NO, g_windowManager.GetActiveWindow()};
-    g_application.getApplicationMessenger().SendMessage(tMsg, true);
+    CApplicationMessenger::Get().SendMessage(tMsg, true);
 
     if (!pDialogYesNo->IsConfirmed()) return;
 
@@ -156,7 +167,7 @@ void CAddonStatusHandler::Process()
 
     //send message and wait for user input
     ThreadMessage tMsg = {TMSG_DIALOG_DOMODAL, WINDOW_DIALOG_OK, g_windowManager.GetActiveWindow()};
-    g_application.getApplicationMessenger().SendMessage(tMsg, true);
+    CApplicationMessenger::Get().SendMessage(tMsg, true);
   }
 }
 

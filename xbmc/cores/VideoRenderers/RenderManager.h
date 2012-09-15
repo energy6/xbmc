@@ -66,7 +66,7 @@ public:
   void SetViewMode(int iViewMode);
 
   // Functions called from mplayer
-  bool Configure(unsigned int width, unsigned int height, unsigned int d_width, unsigned int d_height, float fps, unsigned flags, ERenderFormat format, unsigned extended_format);
+  bool Configure(unsigned int width, unsigned int height, unsigned int d_width, unsigned int d_height, float fps, unsigned flags, ERenderFormat format, unsigned extended_format,  unsigned int orientation);
   bool IsConfigured();
 
   int AddVideoPicture(DVDVideoPicture& picture);
@@ -131,12 +131,13 @@ public:
 
   CSharedSection& GetSection() { return m_sharedSection; };
 
+  void RegisterRenderUpdateCallBack(const void *ctx, RenderUpdateCallBackFn fn);
+
 protected:
   void Render(bool clear, DWORD flags, DWORD alpha);
 
   void PresentSingle(bool clear, DWORD flags, DWORD alpha);
-  void PresentWeave(bool clear, DWORD flags, DWORD alpha);
-  void PresentBob(bool clear, DWORD flags, DWORD alpha);
+  void PresentFields(bool clear, DWORD flags, DWORD alpha);
   void PresentBlend(bool clear, DWORD flags, DWORD alpha);
 
   EINTERLACEMETHOD AutoInterlaceMethodInternal(EINTERLACEMETHOD mInt);

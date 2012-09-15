@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2005-2010 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -20,6 +20,7 @@
  */
 
 #include "Application.h"
+#include "ApplicationMessenger.h"
 #include "Addon.h"
 #include "AddonCallbacksGUI.h"
 #include "utils/log.h"
@@ -205,8 +206,9 @@ GUIHANDLE CAddonCallbacksGUI::Window_New(void *addonData, const char *xmlFilenam
     URIUtils::AddFileToFolder(guiHelper->m_addon->Path(), "resources", basePath);
     URIUtils::AddFileToFolder(basePath, "skins", basePath);
     URIUtils::AddFileToFolder(basePath, defaultSkin, basePath);
+    props.path = basePath;
 
-    skinInfo.Start(basePath);
+    skinInfo.Start();
     strSkinPath = skinInfo.GetSkinPath(xmlFilename, &res, basePath);
 
     if (!XFILE::CFile::Exists(strSkinPath))
@@ -1505,7 +1507,7 @@ void CGUIAddonWindowDialog::Show(bool show /* = true */)
   unsigned int iCount = g_graphicsContext.exit();
   ThreadMessage tMsg = {TMSG_GUI_ADDON_DIALOG, 1, show ? 1 : 0};
   tMsg.lpVoid = this;
-  g_application.getApplicationMessenger().SendMessage(tMsg, true);
+  CApplicationMessenger::Get().SendMessage(tMsg, true);
   g_graphicsContext.restore(iCount);
 }
 

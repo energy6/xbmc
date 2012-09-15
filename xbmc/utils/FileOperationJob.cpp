@@ -29,6 +29,7 @@
 #include "log.h"
 #include "Util.h"
 #include "URIUtils.h"
+#include "URL.h"
 #include "guilib/LocalizeStrings.h"
 #ifdef HAS_FILESYSTEM_RAR
 #include "filesystem/RarManager.h"
@@ -133,6 +134,11 @@ bool CFileOperationJob::DoProcess(FileAction action, CFileItemList & items, cons
       CStdString strNoSlash = pItem->GetPath();
       URIUtils::RemoveSlashAtEnd(strNoSlash);
       CStdString strFileName = URIUtils::GetFileName(strNoSlash);
+
+      // URL Decode for cases where source uses URL encoding and target does not 
+      if ( URIUtils::ProtocolHasEncodedFilename(CURL(pItem->GetPath()).GetProtocol() )
+       && !URIUtils::ProtocolHasEncodedFilename(CURL(strDestFile).GetProtocol() ) )
+        CURL::Decode(strFileName);
 
       // special case for upnp
       if (URIUtils::IsUPnP(items.GetPath()) || URIUtils::IsUPnP(pItem->GetPath()))
@@ -293,9 +299,9 @@ bool CFileOperationJob::CFileOperation::OnFileCallback(void* pContext, int iperc
   double current = data->current + ((double)ipercent * data->opWeight * (double)m_time)/ 100.0;
 
   if (avgSpeed > 1000000.0f)
-    data->base->m_avgSpeed.Format("%.1f Mb/s", avgSpeed / 1000000.0f);
+    data->base->m_avgSpeed.Format("%.1f MB/s", avgSpeed / 1000000.0f);
   else
-    data->base->m_avgSpeed.Format("%.1f Kb/s", avgSpeed / 1000.0f);
+    data->base->m_avgSpeed.Format("%.1f KB/s", avgSpeed / 1000.0f);
 
   return !data->base->ShouldCancel((unsigned)current, 100);
 }

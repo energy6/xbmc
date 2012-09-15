@@ -21,6 +21,7 @@
 
 #include "system.h"
 #include "Application.h"
+#include "ApplicationMessenger.h"
 #include "GUIWindowLoginScreen.h"
 #include "settings/GUIWindowSettingsProfile.h"
 #include "dialogs/GUIDialogContextMenu.h"
@@ -228,7 +229,7 @@ bool CGUIWindowLoginScreen::OnPopupMenu(int iItem)
     if (g_passwordManager.CheckLock(g_settings.GetMasterProfile().getLockMode(),g_settings.GetMasterProfile().getLockCode(),20075))
       g_passwordManager.iMasterLockRetriesLeft = g_guiSettings.GetInt("masterlock.maxretries");
     else // be inconvenient
-      g_application.getApplicationMessenger().Shutdown();
+      CApplicationMessenger::Get().Shutdown();
 
     return true;
   }
@@ -268,6 +269,10 @@ void CGUIWindowLoginScreen::LoadProfile(unsigned int profile)
   // stop service addons and give it some time before we start it again
   ADDON::CAddonMgr::Get().StopServices(true);
 
+  // stop PVR related services
+  g_application.StopPVRManager();
+  g_application.StopEPGManager();
+
   if (profile != 0 || !g_settings.IsMasterUser())
   {
     g_application.getNetwork().NetworkMessage(CNetwork::SERVICES_DOWN,1);
@@ -302,6 +307,10 @@ void CGUIWindowLoginScreen::LoadProfile(unsigned int profile)
 
   // start services which should run on login 
   ADDON::CAddonMgr::Get().StartServices(false);
+
+  // start PVR related services
+  g_application.StartEPGManager();
+  g_application.StartPVRManager();
 
   g_windowManager.ChangeActiveWindow(g_SkinInfo->GetFirstWindow());
 

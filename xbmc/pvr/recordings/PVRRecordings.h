@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -26,16 +26,18 @@
 #include "utils/Observer.h"
 #include "ThumbLoader.h"
 
+#define PVR_ALL_RECORDINGS_PATH_EXTENSION "-1"
+
 namespace PVR
 {
-  class CPVRRecordings : public std::vector<CPVRRecording *>,
-                         public Observable
+  class CPVRRecordings : public Observable
   {
   private:
-    CCriticalSection m_critSection;
-    bool             m_bIsUpdating;
-    CStdString       m_strDirectoryHistory;
-    CVideoThumbLoader m_thumbLoader;
+    CCriticalSection             m_critSection;
+    bool                         m_bIsUpdating;
+    CStdString                   m_strDirectoryHistory;
+    CVideoThumbLoader            m_thumbLoader;
+    std::vector<CPVRRecording *> m_recordings;
 
     virtual void UpdateFromClients(void);
     virtual CStdString TrimSlashes(const CStdString &strOrig) const;
@@ -43,6 +45,10 @@ namespace PVR
     virtual bool IsDirectoryMember(const CStdString &strDirectory, const CStdString &strEntryDirectory, bool bDirectMember = true) const;
     virtual void GetContents(const CStdString &strDirectory, CFileItemList *results);
     virtual void GetSubDirectories(const CStdString &strBase, CFileItemList *results, bool bAutoSkip = true);
+
+    bool HasAllRecordingsPathExtension(const CStdString &strDirectory);
+    CStdString AddAllRecordingsPathExtension(const CStdString &strDirectory);
+    CStdString RemoveAllRecordingsPathExtension(const CStdString &strDirectory);
 
   public:
     CPVRRecordings(void);
@@ -63,8 +69,11 @@ namespace PVR
     int GetRecordings(CFileItemList* results);
     bool DeleteRecording(const CFileItem &item);
     bool RenameRecording(CFileItem &item, CStdString &strNewName);
+    bool SetRecordingsPlayCount(const CFileItemPtr &item, int count);
 
     bool GetDirectory(const CStdString& strPath, CFileItemList &items);
-    CPVRRecording *GetByPath(const CStdString &path);
+    CFileItemPtr GetByPath(const CStdString &path);
+    void SetPlayCount(const CFileItem &item, int iPlayCount);
+    void GetAll(CFileItemList &items);
   };
 }

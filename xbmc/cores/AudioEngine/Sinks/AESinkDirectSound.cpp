@@ -35,6 +35,7 @@
 #include <mmdeviceapi.h>
 #include <Functiondiscoverykeys_devpkey.h>
 #include <Rpc.h>
+#include "cores/AudioEngine/Utils/AEUtil.h"
 #pragma comment(lib, "Rpcrt4.lib")
 
 extern HWND g_hWnd;
@@ -129,7 +130,7 @@ bool CAESinkDirectSound::Initialize(AEAudioFormat &format, std::string &device)
 
   LPGUID deviceGUID = NULL;
   RPC_CSTR wszUuid  = NULL;
-  HRESULT hr;
+  HRESULT hr = E_FAIL;
   std::list<DSDevice> DSDeviceList;
   std::string deviceFriendlyName;
   DirectSoundEnumerate(DSEnumCallback, &DSDeviceList);
@@ -151,7 +152,7 @@ bool CAESinkDirectSound::Initialize(AEAudioFormat &format, std::string &device)
   if (hr == RPC_S_OK) RpcStringFree(&wszUuid);
   }
 
- hr = DirectSoundCreate(deviceGUID, &m_pDSound, NULL);
+  hr = DirectSoundCreate(deviceGUID, &m_pDSound, NULL);
 
   if (FAILED(hr))
   {
@@ -354,7 +355,7 @@ bool CAESinkDirectSound::IsCompatible(const AEAudioFormat format, const std::str
   return false;
 }
 
-unsigned int CAESinkDirectSound::AddPackets(uint8_t *data, unsigned int frames)
+unsigned int CAESinkDirectSound::AddPackets(uint8_t *data, unsigned int frames, bool hasAudio)
 {
   if (!m_initialized)
     return 0;
@@ -458,7 +459,6 @@ double CAESinkDirectSound::GetCacheTotal()
 void CAESinkDirectSound::EnumerateDevicesEx(AEDeviceInfoList &deviceInfoList)
 {
   CAEDeviceInfo        deviceInfo;
-  OSVERSIONINFO        osvi;
 
   IMMDeviceEnumerator* pEnumerator = NULL;
   IMMDeviceCollection* pEnumDevices = NULL;
@@ -467,12 +467,7 @@ void CAESinkDirectSound::EnumerateDevicesEx(AEDeviceInfoList &deviceInfoList)
   HRESULT                hr;
 
   /* See if we are on Windows XP */
-  ZeroMemory(&osvi, sizeof(OSVERSIONINFO));
-  osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-
-  GetVersionEx(&osvi);
-
-  if (osvi.dwMajorVersion == 5)
+  if (!g_sysinfo.IsVistaOrHigher())
   {
     /* We are on XP - WASAPI not supported - enumerate using DS devices */
     LPGUID deviceGUID = NULL;
@@ -593,13 +588,13 @@ void CAESinkDirectSound::EnumerateDevicesEx(AEDeviceInfoList &deviceInfoList)
     IAudioClient *pClient;
     hr = pDevice->Activate(IID_IAudioClient, CLSCTX_ALL, NULL, (void**)&pClient);
     if (FAILED(hr))
-      {
-        CLog::Log(LOGERROR, __FUNCTION__": Activate device failed (%s)", WASAPIErrToStr(hr));
-      }
+    {
+      CLog::Log(LOGERROR, __FUNCTION__": Activate device failed (%s)", WASAPIErrToStr(hr));
+    }
 
     //hr = pClient->GetMixFormat(&pwfxex);
     hr = pProperty->GetValue(PKEY_AudioEngine_DeviceFormat, &varName);
-    if (SUCCEEDED(hr))
+    if (SUCCEEDED(hr) && varName.blob.cbSize > 0)
     {
       WAVEFORMATEX* smpwfxex = (WAVEFORMATEX*)varName.blob.pBlobData;
       deviceInfo.m_channels = layoutsByChCount[std::min(smpwfxex->nChannels, (WORD) 2)];
@@ -609,7 +604,7 @@ void CAESinkDirectSound::EnumerateDevicesEx(AEDeviceInfoList &deviceInfoList)
     }
     else
     {
-      CLog::Log(LOGERROR, __FUNCTION__": GetMixFormat failed (%s)", WASAPIErrToStr(hr));
+      CLog::Log(LOGERROR, __FUNCTION__": Getting DeviceFormat failed (%s)", WASAPIErrToStr(hr));
     }
     pClient->Release();
 
@@ -649,8 +644,9 @@ void CAESinkDirectSound::CheckPlayStatus()
   if (!(status & DSBSTATUS_PLAYING) && m_CacheLen != 0) // If we have some data, see if we can start playback
   {
     HRESULT hr = m_pBuffer->Play(0, 0, DSBPLAY_LOOPING);
-    dserr2str(hr);
     CLog::Log(LOGDEBUG,__FUNCTION__ ": Resuming Playback");
+    if (FAILED(hr))
+      CLog::Log(LOGERROR, __FUNCTION__": Failed to play the DirectSound buffer: %s", dserr2str(hr));
   }
 }
 

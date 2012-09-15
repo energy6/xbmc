@@ -27,7 +27,6 @@
 #include "URL.h"
 #include "filesystem/CurlFile.h"
 #include "filesystem/ZipFile.h"
-#include "pictures/Picture.h"
 #include "URIUtils.h"
 
 #include <cstring>
@@ -158,7 +157,11 @@ const CScraperUrl::SUrlEntry CScraperUrl::GetFirstThumb() const
     if (iter->m_type == URL_TYPE_GENERAL)
       return *iter;
   }
+
   SUrlEntry result;
+  result.m_type = URL_TYPE_GENERAL;
+  result.m_post = false;
+  result.m_isgz = false;
   result.m_season = -1;
   return result;
 }
@@ -170,7 +173,11 @@ const CScraperUrl::SUrlEntry CScraperUrl::GetSeasonThumb(int season) const
     if (iter->m_type == URL_TYPE_SEASON && iter->m_season == season)
       return *iter;
   }
+
   SUrlEntry result;
+  result.m_type = URL_TYPE_GENERAL;
+  result.m_post = false;
+  result.m_isgz = false;
   result.m_season = -1;
   return result;
 }
@@ -201,14 +208,16 @@ bool CScraperUrl::Get(const SUrlEntry& scrURL, std::string& strHTML, XFILE::CCur
     if (XFILE::CFile::Exists(strCachePath))
     {
       XFILE::CFile file;
-      file.Open(strCachePath);
-      char* temp = new char[(int)file.GetLength()];
-      file.Read(temp,file.GetLength());
-      strHTML.clear();
-      strHTML.append(temp,temp+file.GetLength());
-      file.Close();
-      delete[] temp;
-      return true;
+      if (file.Open(strCachePath))
+      {
+        char* temp = new char[(int)file.GetLength()];
+        file.Read(temp,file.GetLength());
+        strHTML.clear();
+        strHTML.append(temp,temp+file.GetLength());
+        file.Close();
+        delete[] temp;
+        return true;
+      }
     }
   }
 
@@ -253,42 +262,6 @@ bool CScraperUrl::Get(const SUrlEntry& scrURL, std::string& strHTML, XFILE::CCur
     file.Close();
   }
   return true;
-}
-
-bool CScraperUrl::DownloadThumbnail(const CStdString &thumb, const CScraperUrl::SUrlEntry& entry)
-{
-  if (entry.m_url.IsEmpty())
-    return false;
-
-  CURL url(entry.m_url);
-  if (url.GetProtocol() != "http")
-  { // do a direct file copy
-    try
-    {
-      return CPicture::CreateThumbnail(entry.m_url, thumb);
-    }
-    catch (...)
-    {
-      XFILE::CFile::Delete(thumb);
-    }
-    return false;
-  }
-
-  XFILE::CCurlFile http;
-  http.SetReferer(entry.m_spoof);
-  CStdString thumbData;
-  if (http.Get(entry.m_url, thumbData))
-  {
-    try
-    {
-      return CPicture::CreateThumbnailFromMemory((const BYTE *)thumbData.c_str(), thumbData.size(), URIUtils::GetExtension(entry.m_url), thumb);
-    }
-    catch (...)
-    {
-      XFILE::CFile::Delete(thumb);
-    }
-  }
-  return false;
 }
 
 // XML format is of strUrls is:

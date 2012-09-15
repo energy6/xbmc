@@ -24,10 +24,10 @@
 #include "guilib/LocalizeStrings.h"
 #include "IoSupport.h"
 #include "URL.h"
-#include "Util.h"
 #include "utils/URIUtils.h"
 #ifdef _WIN32
 #include "WIN32Util.h"
+#include "utils/CharsetConverter.h"
 #endif
 #include "guilib/GUIWindowManager.h"
 #ifdef HAS_DVD_DRIVE
@@ -54,8 +54,10 @@
 #include "filesystem/Directory.h"
 #include "utils/Crc32.h"
 
-#ifdef __APPLE__
+#if defined(TARGET_DARWIN)
 #include "osx/DarwinStorageProvider.h"
+#elif defined(TARGET_ANDROID)
+#include "android/AndroidStorageProvider.h"
 #elif defined(_LINUX)
 #include "linux/LinuxStorageProvider.h"
 #elif _WIN32
@@ -87,8 +89,10 @@ void CMediaManager::Initialize()
 {
   if (!m_platformStorage)
   {
-    #ifdef __APPLE__
+    #if defined(TARGET_DARWIN)
       m_platformStorage = new CDarwinStorageProvider();
+    #elif defined(TARGET_ANDROID)
+      m_platformStorage = new CAndroidStorageProvider();
     #elif defined(_LINUX)
       m_platformStorage = new CLinuxStorageProvider();
     #elif _WIN32
@@ -96,7 +100,11 @@ void CMediaManager::Initialize()
     #endif
   }
 #ifdef HAS_DVD_DRIVE
-  strFirstAvailDrive = MEDIA_DETECT::CLibcdio::GetInstance()->GetDeviceFileName();
+#if defined(TARGET_WINDOWS)
+  m_strFirstAvailDrive = CWIN32Util::GetFirstOpticalDrive();
+#else
+  m_strFirstAvailDrive = MEDIA_DETECT::CLibcdio::GetInstance()->GetDeviceFileName();
+#endif
 #endif
   m_platformStorage->Initialize();
 }
@@ -304,7 +312,7 @@ CStdString CMediaManager::TranslateDevicePath(const CStdString& devicePath, bool
   // fallback for cdda://local/ and empty devicePath
 #ifdef HAS_DVD_DRIVE
   if(devicePath.empty() || devicePath.Left(12).Compare("cdda://local")==0)
-    strDevice = strFirstAvailDrive;
+    strDevice = m_strFirstAvailDrive;
 #endif
 
 #ifdef _WIN32
@@ -463,12 +471,13 @@ CStdString CMediaManager::GetDiskLabel(const CStdString& devicePath)
     return "";
 
   CStdString strDevice = TranslateDevicePath(devicePath);
-  char cVolumenName[128];
-  char cFSName[128];
+  WCHAR cVolumenName[128];
+  WCHAR cFSName[128];
   URIUtils::AddSlashAtEnd(strDevice);
-  if(GetVolumeInformation(strDevice.c_str(), cVolumenName, 127, NULL, NULL, NULL, cFSName, 127)==0)
+  if(GetVolumeInformationW(CStdStringW(strDevice).c_str(), cVolumenName, 127, NULL, NULL, NULL, cFSName, 127)==0)
     return "";
-  return CStdString(cVolumenName).TrimRight(" ");
+  g_charsetConverter.wToUTF8(cVolumenName, strDevice);
+  return strDevice.TrimRight(" ");
 #else
   return MEDIA_DETECT::CDetectDVDMedia::GetDVDLabel();
 #endif
@@ -541,7 +550,7 @@ bool CMediaManager::HashDVD(const CStdString& dvdpath, uint32_t& crc)
   Crc32 crc32;
   bool dataRead = false;
 
-  vecItemsTS.Sort(SORT_METHOD_FILE, SORT_ORDER_ASC);
+  vecItemsTS.Sort(SORT_METHOD_FILE, SortOrderAscending);
   for (int i = 0; i < vecItemsTS.Size(); i++)
   {
     CFileItemPtr videoTSItem = vecItemsTS[i];

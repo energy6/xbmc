@@ -33,6 +33,7 @@
 #endif
 #include "filesystem/File.h"
 #include "filesystem/Directory.h"
+#include "URL.h"
 #include <assert.h>
 
 using namespace std;
@@ -326,6 +327,8 @@ int CGUITextureManager::Load(const CStdString& strTextureName, bool checkBundleO
       if (!nImages)
       {
         CLog::Log(LOGERROR, "Texture manager unable to load bundled file: %s", strTextureName.c_str());
+        delete [] pTextures;
+        delete [] Delay;
         return 0;
       }
 
@@ -392,7 +395,7 @@ int CGUITextureManager::Load(const CStdString& strTextureName, bool checkBundleO
   int width = 0, height = 0;
   if (bundle >= 0)
   {
-    if (FAILED(m_TexBundle[bundle].LoadTexture(strTextureName, &pTexture, width, height)))
+    if (!m_TexBundle[bundle].LoadTexture(strTextureName, &pTexture, width, height))
     {
       CLog::Log(LOGERROR, "Texture manager unable to load bundled file: %s", strTextureName.c_str());
       return 0;
@@ -400,8 +403,8 @@ int CGUITextureManager::Load(const CStdString& strTextureName, bool checkBundleO
   }
   else
   {
-    pTexture = new CTexture();
-    if(!pTexture->LoadFromFile(strPath))
+    pTexture = CBaseTexture::LoadFromFile(strPath);
+    if (!pTexture)
       return 0;
     width = pTexture->GetWidth();
     height = pTexture->GetHeight();

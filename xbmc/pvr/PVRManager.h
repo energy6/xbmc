@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -21,13 +21,12 @@
  */
 
 #include "threads/Thread.h"
-#include "utils/Observer.h"
 #include "utils/JobManager.h"
 #include "threads/Event.h"
-#include "windows/GUIWindowPVRCommon.h"
 #include "addons/include/xbmc_pvr_types.h"
 
-class CGUIDialogExtendedProgressBar;
+class CGUIDialogProgressBarHandle;
+class CStopWatch;
 
 namespace EPG
 {
@@ -37,12 +36,16 @@ namespace EPG
 namespace PVR
 {
   class CPVRClients;
+  class CPVRChannel;
+  typedef boost::shared_ptr<PVR::CPVRChannel> CPVRChannelPtr;
   class CPVRChannelGroupsContainer;
   class CPVRChannelGroup;
+  class CPVRRecording;
   class CPVRRecordings;
   class CPVRTimers;
   class CPVRGUIInfo;
   class CPVRDatabase;
+  class CGUIWindowPVRCommon;
 
   enum ManagerState
   {
@@ -59,6 +62,8 @@ namespace PVR
   #define g_PVRTimers        g_PVRManager.Timers()
   #define g_PVRRecordings    g_PVRManager.Recordings()
   #define g_PVRClients       g_PVRManager.Clients()
+
+  typedef boost::shared_ptr<PVR::CPVRChannelGroup> CPVRChannelGroupPtr;
 
   class CPVRManager : private CThread
   {
@@ -189,7 +194,7 @@ namespace PVR
      * @param channel The channel or NULL if none is playing.
      * @return True if a channel is playing, false otherwise.
      */
-    bool GetCurrentChannel(CPVRChannel &channel) const;
+    bool GetCurrentChannel(CPVRChannelPtr &channel) const;
 
     /*!
      * @brief Return the EPG for the channel that is currently playing.
@@ -224,10 +229,10 @@ namespace PVR
 
     /*!
      * @brief Open a stream from the given channel.
-     * @param tag The channel to open.
+     * @param channel The channel to open.
      * @return True if the stream was opened, false otherwise.
      */
-    bool OpenLiveStream(const CPVRChannel &tag);
+    bool OpenLiveStream(const CFileItem &channel);
 
     /*!
      * @brief Open a stream from the given recording.
@@ -278,14 +283,14 @@ namespace PVR
      * @brief Set the current playing group, used to load the right channel.
      * @param group The new group.
      */
-    void SetPlayingGroup(CPVRChannelGroup *group);
+    void SetPlayingGroup(CPVRChannelGroupPtr group);
 
     /*!
      * @brief Get the current playing group, used to load the right channel.
      * @param bRadio True to get the current radio group, false to get the current TV group.
      * @return The current group or the group containing all channels if it's not set.
      */
-    CPVRChannelGroup *GetPlayingGroup(bool bRadio = false);
+    CPVRChannelGroupPtr GetPlayingGroup(bool bRadio = false);
 
     /*!
      * @brief Let the background thread update the recordings list.
@@ -398,12 +403,6 @@ namespace PVR
     bool IsRunningChannelScan(void) const;
 
     /*!
-     * @brief Get the capabilities of the current playing client.
-     * @return The capabilities.
-     */
-    PVR_ADDON_CAPABILITIES GetCurrentAddonCapabilities(void);
-
-    /*!
      * @brief Open a selection dialog and start a channel scan on the selected client.
      */
     void StartChannelScan(void);
@@ -423,6 +422,53 @@ namespace PVR
      */
     void LoadCurrentChannelSettings(void);
 
+    /*!
+     * @brief Check if channel is parental locked. Ask for PIN if neccessary.
+     * @param channel The channel to open.
+     * @return True if channel is unlocked (by default or PIN unlocked), false otherwise.
+     */
+    bool CheckParentalLock(const CPVRChannel &channel);
+
+    /*!
+     * @brief Check if parental lock is overriden at the given moment.
+     * @param channel The channel to open.
+     * @return True if parental lock is overriden, false otherwise.
+     */
+    bool IsParentalLocked(const CPVRChannel &channel);
+
+    /*!
+     * @brief Open Numeric dialog to check for parental PIN.
+     * @param strTitle Override the title of the dialog if set.
+     * @return True if entered PIN was correct, false otherwise.
+     */
+    bool CheckParentalPIN(const char *strTitle = NULL);
+
+    /*!
+     * @brief Executes "pvrpowermanagement.setwakeupcmd"
+     */
+    bool SetWakeupCommand(void);
+
+    /*!
+     * @brief Update the last played position for the current playing file
+     * @param lastplayedposition channel The channel to start to play.
+     */
+    bool UpdateCurrentLastPlayedPosition(int lastplayedposition);
+
+    /*!
+     * @brief Set the last watched position of a recording on the backend.
+     * @param recording The recording.
+     * @param position The last watched position in seconds
+     * @return True if the last played position was updated successfully, false otherwise
+    */
+    bool SetRecordingLastPlayedPosition(const CPVRRecording &recording, int lastplayedposition);
+
+    /*!
+    * @brief Retrieve the last watched position of a recording on the backend.
+    * @param recording The recording.
+    * @return The last watched position in seconds
+    */
+    int GetRecordingLastPlayedPosition(const CPVRRecording &recording);
+
   protected:
     /*!
      * @brief PVR update and control thread.
@@ -430,9 +476,6 @@ namespace PVR
     virtual void Process(void);
 
   private:
-
-    
-
     /*!
      * @brief Load at least one client and load all other PVR data after loading the client.
      * If some clients failed to load here, the pvrmanager will retry to load them every second.
@@ -498,11 +541,6 @@ namespace PVR
     void ShowProgressDialog(const CStdString &strText, int iProgress);
 
     /*!
-     * @brief Executes "pvrpowermanagement.setwakeupcmd"
-     */
-    bool SetWakeupCommand(void);
-
-    /*!
      * @brief Hide the progress dialog if it's visible.
      */
     void HideProgressDialog(void);
@@ -532,15 +570,11 @@ namespace PVR
     CCriticalSection                m_critSection;                 /*!< critical section for all changes to this class, except for changes to triggers */
     bool                            m_bFirstStart;                 /*!< true when the PVR manager was started first, false otherwise */
     bool                            m_bIsSwitchingChannels;        /*!< true while switching channels */
-    CGUIDialogExtendedProgressBar * m_loadingProgressDialog;       /*!< progress dialog that is displayed while the pvrmanager is loading */
-
-    int                             m_PreviousChannel[2];
-    int                             m_PreviousChannelIndex;
-    int                             m_LastChannel;
-    unsigned int                    m_LastChannelChanged;
+    CGUIDialogProgressBarHandle *   m_progressHandle;              /*!< progress dialog that is displayed while the pvrmanager is loading */
 
     CCriticalSection                m_managerStateMutex;
     ManagerState                    m_managerState;
+    CStopWatch                     *m_parentalTimer;
   };
 
   class CPVRRecordingsUpdateJob : public CJob

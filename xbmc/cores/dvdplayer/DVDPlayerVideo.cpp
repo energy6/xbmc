@@ -35,7 +35,6 @@
 #include "DVDCodecs/Video/DVDVideoCodecFFmpeg.h"
 #include "DVDDemuxers/DVDDemux.h"
 #include "DVDDemuxers/DVDDemuxUtils.h"
-#include "../../Util.h"
 #include "DVDOverlayRenderer.h"
 #include "DVDPerformanceCounter.h"
 #include "DVDCodecs/DVDCodecs.h"
@@ -140,6 +139,9 @@ CDVDPlayerVideo::CDVDPlayerVideo( CDVDClock* pClock
   m_started = false;
   m_iVideoDelay = 0;
   m_iSubtitleDelay = 0;
+  m_FlipTimeStamp = 0.0;
+  m_iLateFrames = 0;
+  m_iDroppedRequest = 0;
   m_fForcedAspectRatio = 0;
   m_iNrOfPicturesNotToSkip = 0;
   m_messageQueue.SetMaxDataSize(40 * 1024 * 1024);
@@ -149,8 +151,17 @@ CDVDPlayerVideo::CDVDPlayerVideo( CDVDClock* pClock
   m_iCurrentPts = DVD_NOPTS_VALUE;
   m_iDroppedFrames = 0;
   m_fFrameRate = 25;
+  m_bCalcFrameRate = false;
+  m_fStableFrameRate = 0.0;
+  m_iFrameRateCount = 0;
+  m_bAllowDrop = false;
+  m_iFrameRateErr = 0;
+  m_iFrameRateLength = 0;
   m_bFpsInvalid = false;
   m_bAllowFullscreen = false;
+  m_droptime = 0.0;
+  m_dropbase = 0.0;
+  m_autosync = 1;
   memset(&m_output, 0, sizeof(m_output));
 }
 
@@ -224,7 +235,7 @@ void CDVDPlayerVideo::OpenStream(CDVDStreamInfo &hint, CDVDVideoCodec* codec)
   m_bFpsInvalid = (hint.fpsrate == 0 || hint.fpsscale == 0);
 
   m_bCalcFrameRate = g_guiSettings.GetBool("videoplayer.usedisplayasclock") ||
-                     g_guiSettings.GetBool("videoplayer.adjustrefreshrate");
+                     g_guiSettings.GetInt("videoplayer.adjustrefreshrate") != ADJUST_REFRESHRATE_OFF;
   ResetFrameRateCalc();
 
   m_iDroppedRequest = 0;
@@ -362,13 +373,19 @@ void CDVDPlayerVideo::Process()
 
     if (pMsg->IsType(CDVDMsg::GENERAL_SYNCHRONIZE))
     {
-      ((CDVDMsgGeneralSynchronize*)pMsg)->Wait( &m_bStop, SYNCSOURCE_VIDEO );
-      CLog::Log(LOGDEBUG, "CDVDPlayerVideo - CDVDMsg::GENERAL_SYNCHRONIZE");
+      if(((CDVDMsgGeneralSynchronize*)pMsg)->Wait(100, SYNCSOURCE_VIDEO))
+      {
+        CLog::Log(LOGDEBUG, "CDVDPlayerVideo - CDVDMsg::GENERAL_SYNCHRONIZE");
+
+        /* we may be very much off correct pts here, but next picture may be a still*/
+        /* make sure it isn't dropped */
+        m_iNrOfPicturesNotToSkip = 5;
+      }
+      else
+        m_messageQueue.Put(pMsg->Acquire(), 1); /* push back as prio message, to process other prio messages */
+
       pMsg->Release();
 
-      /* we may be very much off correct pts here, but next picture may be a still*/
-      /* make sure it isn't dropped */
-      m_iNrOfPicturesNotToSkip = 5;
       continue;
     }
     else if (pMsg->IsType(CDVDMsg::GENERAL_RESYNC))
@@ -522,6 +539,9 @@ void CDVDPlayerVideo::Process()
           mFilters |=  CDVDVideoCodec::FILTER_DEINTERLACE_FLAGGED;
       }
 
+      if (!g_renderManager.Supports(RENDERFEATURE_ROTATION))
+        mFilters |= CDVDVideoCodec::FILTER_ROTATE;
+
       mFilters = m_pVideoCodec->SetFilters(mFilters);
 
       int iDecoderState = m_pVideoCodec->Decode(pPacket->pData, pPacket->iSize, pPacket->dts, pPacket->pts);
@@ -530,7 +550,7 @@ void CDVDPlayerVideo::Process()
       if(m_pVideoCodec->GetConvergeCount() > 0)
       {
         m_packets.push_back(DVDMessageListItem(pMsg, 0));
-        if(m_packets.size() > m_pVideoCodec->GetConvergeCount() 
+        if(m_packets.size() > m_pVideoCodec->GetConvergeCount()
         || m_packets.size() * frametime > DVD_SEC_TO_TIME(10))
           m_packets.pop_front();
       }
@@ -601,7 +621,7 @@ void CDVDPlayerVideo::Process()
               m_iNrOfPicturesNotToSkip--;
             }
 
-            // validate picture timing, 
+            // validate picture timing,
             // if both dts/pts invalid, use pts calulated from picture.iDuration
             // if pts invalid use dts, else use picture.pts as passed
             if (picture.dts == DVD_NOPTS_VALUE && picture.pts == DVD_NOPTS_VALUE)
@@ -1115,7 +1135,7 @@ int CDVDPlayerVideo::OutputPicture(const DVDVideoPicture* src, double pts)
     }
 
     CLog::Log(LOGDEBUG,"%s - change configuration. %dx%d. framerate: %4.2f. format: %s",__FUNCTION__,pPicture->iWidth, pPicture->iHeight, config_framerate, formatstr.c_str());
-    if(!g_renderManager.Configure(pPicture->iWidth, pPicture->iHeight, pPicture->iDisplayWidth, pPicture->iDisplayHeight, config_framerate, flags, pPicture->format, pPicture->extended_format))
+    if(!g_renderManager.Configure(pPicture->iWidth, pPicture->iHeight, pPicture->iDisplayWidth, pPicture->iDisplayHeight, config_framerate, flags, pPicture->format, pPicture->extended_format, m_hints.orientation))
     {
       CLog::Log(LOGERROR, "%s - failed to configure renderer", __FUNCTION__);
       return EOS_ABORT;
@@ -1279,8 +1299,8 @@ int CDVDPlayerVideo::OutputPicture(const DVDVideoPicture* src, double pts)
   }
   else
   {
-    m_droptime = 0.0f;
-    m_dropbase = 0.0f;
+    m_droptime = 0.0;
+    m_dropbase = 0.0;
   }
 
   // set fieldsync if picture is interlaced

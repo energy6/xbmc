@@ -112,7 +112,7 @@ bool CDVDAudioCodecPassthroughFFmpeg::SetupMuxer(CDVDStreamInfo &hints, CStdStri
    * both to avoid as much dead code as possible.
    * CoreAudio (at least on the cases we've seen) wants IEC 61937 in
    * little-endian format even on big-endian systems. */
-#if defined(WORDS_BIGENDIAN) && !defined(__APPLE__)
+#if defined(WORDS_BIGENDIAN) && !defined(TARGET_DARWIN)
   const char *spdifFlags = "+be";
 #else
   const char *spdifFlags = "-be";
@@ -465,11 +465,7 @@ int CDVDAudioCodecPassthroughFFmpeg::GetChannels()
 {
   //Can't return correct channels here as this is used to keep sync.
   //should probably have some other way to find out this
-  switch(m_codec)
-  {
-    default:
-      return 2;
-  }
+  return 2;
 }
 
 int CDVDAudioCodecPassthroughFFmpeg::GetSampleRate()
@@ -642,9 +638,5 @@ CAEChannelInfo CDVDAudioCodecPassthroughFFmpeg::GetChannelMap()
     {AE_CH_RAW, AE_CH_RAW, AE_CH_RAW, AE_CH_RAW, AE_CH_RAW, AE_CH_RAW, AE_CH_RAW, AE_CH_RAW, AE_CH_NULL}
   };
 
-  switch(m_codec)
-  {
-    default:
-      return map[0];
-  }
+  return map[0];
 }

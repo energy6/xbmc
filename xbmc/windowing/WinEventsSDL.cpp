@@ -25,6 +25,7 @@
 #include "WinEvents.h"
 #include "WinEventsSDL.h"
 #include "Application.h"
+#include "ApplicationMessenger.h"
 #include "guilib/GUIWindowManager.h"
 #ifdef HAS_SDL_JOYSTICK
 #include "input/SDLJoystick.h"
@@ -35,7 +36,7 @@
 #include "osx/CocoaInterface.h"
 #endif
 
-#if defined(_LINUX) && !defined(__APPLE__)
+#if defined(_LINUX) && !defined(__APPLE__) && !defined(__ANDROID__)
 #include <X11/Xlib.h>
 #include <X11/XKBlib.h>
 #include "input/XBMC_keysym.h"
@@ -62,6 +63,7 @@ static uint16_t SymMappingsEvdev[][2] =
 { { 121, XBMCK_VOLUME_MUTE }         // Volume mute
 , { 122, XBMCK_VOLUME_DOWN }         // Volume down
 , { 123, XBMCK_VOLUME_UP }           // Volume up
+, { 124, XBMCK_POWER }               // Power button on PC case
 , { 127, XBMCK_SPACE }               // Pause
 , { 135, XBMCK_MENU }                // Right click
 , { 136, XBMCK_MEDIA_STOP }          // Stop
@@ -221,7 +223,8 @@ bool CWinEventsSDL::MessagePump()
     switch(event.type)
     {
       case SDL_QUIT:
-        if (!g_application.m_bStop) g_application.getApplicationMessenger().Quit();
+        if (!g_application.m_bStop) 
+          CApplicationMessenger::Get().Quit();
         break;
 
 #ifdef HAS_SDL_JOYSTICK
@@ -401,7 +404,7 @@ bool CWinEventsSDL::ProcessOSXShortcuts(SDL_Event& event)
     {
     case SDLK_q:  // CMD-q to quit
       if (!g_application.m_bStop)
-        g_application.getApplicationMessenger().Quit();
+        CApplicationMessenger::Get().Quit();
       return true;
 
     case SDLK_f: // CMD-f to toggle fullscreen
@@ -414,7 +417,7 @@ bool CWinEventsSDL::ProcessOSXShortcuts(SDL_Event& event)
 
     case SDLK_h: // CMD-h to hide (but we minimize for now)
     case SDLK_m: // CMD-m to minimize
-      g_application.getApplicationMessenger().Minimize();
+      CApplicationMessenger::Get().Minimize();
       return true;
 
     default:

@@ -20,7 +20,6 @@
  */
 
 #include "DVDPlayerCodec.h"
-#include "Util.h"
 #include "cores/AudioEngine/Utils/AEUtil.h"
 
 #include "cores/dvdplayer/DVDInputStreams/DVDFactoryInputStream.h"
@@ -30,6 +29,7 @@
 #include "cores/dvdplayer/DVDCodecs/DVDFactoryCodec.h"
 #include "utils/log.h"
 #include "settings/GUISettings.h"
+#include "URL.h"
 
 #include "AudioDecoder.h"
 
@@ -39,6 +39,7 @@ DVDPlayerCodec::DVDPlayerCodec()
   m_pDemuxer = NULL;
   m_pInputStream = NULL;
   m_pAudioCodec = NULL;
+  m_nAudioStream = -1;
   m_audioPos = 0;
   m_pPacket = NULL;
   m_decoded = NULL;;

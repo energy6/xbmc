@@ -101,32 +101,20 @@ bool CAddonDatabase::CreateTables()
 
 bool CAddonDatabase::UpdateOldVersion(int version)
 {
-  BeginTransaction();
-  
-  try
+  if (version < 13)
   {
-    if (version < 13)
-    {
-      m_pDS->exec("CREATE TABLE dependencies (id integer, addon text, version text, optional boolean)\n");
-      m_pDS->exec("CREATE INDEX idxDependencies ON dependencies(id)");
-    }
-    if (version < 14)
-    {
-      m_pDS->exec("ALTER TABLE addon add minversion text");
-    }
-    if (version < 15)
-    {
-      m_pDS->exec("CREATE TABLE blacklist (id integer primary key, addonID text, version text)\n");
-      m_pDS->exec("CREATE UNIQUE INDEX idxBlack ON blacklist(addonID)");
-    }
+    m_pDS->exec("CREATE TABLE dependencies (id integer, addon text, version text, optional boolean)\n");
+    m_pDS->exec("CREATE INDEX idxDependencies ON dependencies(id)");
   }
-  catch (...)
+  if (version < 14)
   {
-    CLog::Log(LOGERROR, "Error attempting to upgrade an old addon database!");
-    RollbackTransaction();
-    return false;
+    m_pDS->exec("ALTER TABLE addon add minversion text");
   }
-  CommitTransaction();
+  if (version < 15)
+  {
+    m_pDS->exec("CREATE TABLE blacklist (id integer primary key, addonID text, version text)\n");
+    m_pDS->exec("CREATE UNIQUE INDEX idxBlack ON blacklist(addonID)");
+  }
   return true;
 }
 
@@ -169,6 +157,9 @@ int CAddonDatabase::AddAddon(const AddonPtr& addon,
       sql = PrepareSQL("insert into dependencies(id, addon, version, optional) values (%i, '%s', '%s', %i)", idAddon, i->first.c_str(), i->second.first.c_str(), i->second.second ? 1 : 0);
       m_pDS->exec(sql.c_str());
     }
+    // these need to be configured
+    if (addon->Type() == ADDON_PVRDLL)
+      DisableAddon(addon->ID(), true);
     return idAddon;
   }
   catch (...)
@@ -280,7 +271,7 @@ bool CAddonDatabase::GetAddon(int id, AddonPtr& addon)
       m_pDS2->query(sql.c_str());
       while (!m_pDS2->eof())
       {
-        props.dependencies.insert(make_pair(m_pDS2->fv(0).get_asString(), make_pair(m_pDS2->fv(1).get_asString(), m_pDS2->fv(2).get_asBool())));
+        props.dependencies.insert(make_pair(m_pDS2->fv(0).get_asString(), make_pair(AddonVersion(m_pDS2->fv(1).get_asString()), m_pDS2->fv(2).get_asBool())));
         m_pDS2->next();
       }
 

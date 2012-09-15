@@ -41,6 +41,7 @@
 #include "utils/XMLUtils.h"
 #include "GUIAudioManager.h"
 #include "Application.h"
+#include "ApplicationMessenger.h"
 #include "utils/Variant.h"
 
 #ifdef HAS_PERFORMANCE_SAMPLE
@@ -53,7 +54,7 @@ CGUIWindow::CGUIWindow(int id, const CStdString &xmlFile)
 {
   SetID(id);
   SetProperty("xmlfile", xmlFile);
-  m_idRange = 1;
+  m_idRange.push_back(id);
   m_lastControlID = 0;
   m_overlayState = OVERLAY_STATE_PARENT_WINDOW;   // Use parent or previous window's state
   m_isDialog = false;
@@ -301,6 +302,12 @@ void CGUIWindow::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregi
   CGUIControlGroup::DoProcess(currentTime, dirtyregions);
   if (size != g_graphicsContext.RemoveTransform())
     CLog::Log(LOGERROR, "Unbalanced UI transforms (was %d)", size);
+
+  // check if currently focused control can have it
+  // and fallback to default control if not
+  CGUIControl* focusedControl = GetFocusedControl();
+  if (focusedControl && !focusedControl->CanFocus())
+    SET_CONTROL_FOCUS(m_defaultControl, 0);
 }
 
 void CGUIWindow::DoRender()
@@ -365,7 +372,7 @@ void CGUIWindow::Close(bool forceClose /*= false*/, int nextWindowID /*= 0*/, bo
   {
     // make sure graphics lock is not held
     CSingleExit leaveIt(g_graphicsContext);
-    g_application.getApplicationMessenger().Close(this, forceClose, bWait, nextWindowID, enableSound);
+    CApplicationMessenger::Get().Close(this, forceClose, bWait, nextWindowID, enableSound);
   }
   else
     Close_Internal(forceClose, nextWindowID, enableSound);
@@ -848,7 +855,13 @@ bool CGUIWindow::OnMove(int fromControl, int moveAction)
   while (control)
   { // grab the next control direction
     moveHistory.push_back(nextControl);
-    nextControl = control->GetNextControl(moveAction);
+    CGUIAction action;
+    if (!control->GetNavigationAction(moveAction, action))
+      return false;
+    action.ExecuteActions(nextControl, GetParentID());
+    nextControl = action.GetNavigation();
+    if (!nextControl) // 0 isn't valid control id
+      return false;
     // check our history - if the nextControl is in it, we can't focus it
     for (unsigned int i = 0; i < moveHistory.size(); i++)
     {
@@ -966,12 +979,12 @@ void CGUIWindow::SetRunActionsManually()
 
 void CGUIWindow::RunLoadActions()
 {
-  m_loadActions.Execute(GetID(), GetParentID());
+  m_loadActions.ExecuteActions(GetID(), GetParentID());
 }
 
 void CGUIWindow::RunUnloadActions()
 {
-  m_unloadActions.Execute(GetID(), GetParentID());
+  m_unloadActions.ExecuteActions(GetID(), GetParentID());
 }
 
 void CGUIWindow::ClearBackground()
@@ -980,4 +993,14 @@ void CGUIWindow::ClearBackground()
   color_t color = m_clearBackground;
   if (color)
     g_graphicsContext.Clear(color);
+}
+
+bool CGUIWindow::HasID(int controlID) const
+{
+  for (std::vector<int>::const_iterator it = m_idRange.begin(); it != m_idRange.end() ; it++)
+  {
+    if (controlID == *it)
+      return true;
+  }
+  return false;
 }

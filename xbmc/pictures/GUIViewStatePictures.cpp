@@ -27,7 +27,6 @@
 #include "settings/Settings.h"
 #include "filesystem/Directory.h"
 #include "filesystem/PluginDirectory.h"
-#include "Util.h"
 #include "guilib/LocalizeStrings.h"
 #include "guilib/Key.h"
 
@@ -44,7 +43,7 @@ CGUIViewStateWindowPictures::CGUIViewStateWindowPictures(const CFileItemList& it
 
     SetViewAsControl(DEFAULT_VIEW_LIST);
 
-    SetSortOrder(SORT_ORDER_ASC);
+    SetSortOrder(SortOrderAscending);
   }
   else
   {

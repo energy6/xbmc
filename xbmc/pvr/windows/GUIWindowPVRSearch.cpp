@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -93,7 +93,7 @@ bool CGUIWindowPVRSearch::OnContextButton(int itemNumber, CONTEXT_BUTTON button)
       CGUIWindowPVRCommon::OnContextButton(itemNumber, button);
 }
 
-void CGUIWindowPVRSearch::UpdateData(void)
+void CGUIWindowPVRSearch::UpdateData(bool bUpdateSelectedFile /* = true */)
 {
   CLog::Log(LOGDEBUG, "CGUIWindowPVRSearch - %s - update window '%s'. set view to %d", __FUNCTION__, GetName(), m_iControlList);
   m_bUpdateRequired = false;
@@ -145,7 +145,9 @@ void CGUIWindowPVRSearch::UpdateData(void)
   }
 
   m_parent->m_viewControl.SetItems(*m_parent->m_vecItems);
-  m_parent->m_viewControl.SetSelectedItem(m_iSelected);
+
+  if (bUpdateSelectedFile)
+    m_parent->m_viewControl.SetSelectedItem(m_iSelected);
 
   m_parent->SetLabel(CONTROL_LABELHEADER, g_localizeStrings.Get(283));
   m_parent->SetLabel(CONTROL_LABELGROUP, "");

@@ -25,6 +25,7 @@
 
 #include "JSONRPCUtils.h"
 #include "interfaces/IAnnouncer.h"
+#include "playlists/SmartPlayList.h"
 #include "utils/JSONVariantWriter.h"
 #include "utils/JSONVariantParser.h"
 
@@ -263,7 +264,10 @@ namespace JSONRPC
       }
 
       if (jsonObject.size() == 1)
-        jsonObject = jsonObject[0];
+      {
+        CVariant jsonType = jsonObject[0];
+        jsonObject = jsonType;
+      }
     }
 
     static inline const char *ValueTypeToString(CVariant::VariantType valueType)
@@ -391,6 +395,26 @@ namespace JSONRPC
       stringArray.clear();
       for (CVariant::const_iterator_array it = jsonStringArray.begin_array(); it != jsonStringArray.end_array(); it++)
         stringArray.push_back(it->asString());
+    }
+
+    static bool GetXspFiltering(const CStdString &type, const CVariant &filter, CStdString &xsp)
+    {
+      if (type.empty() || !filter.isObject())
+        return false;
+
+      CVariant xspObj(CVariant::VariantTypeObject);
+      xspObj["type"] = type;
+
+      if (filter.isMember("field"))
+      {
+        xspObj["rules"]["and"] = CVariant(CVariant::VariantTypeArray);
+        xspObj["rules"]["and"].push_back(filter);
+      }
+      else
+        xspObj["rules"] = filter;
+
+      CSmartPlaylist playlist;
+      return playlist.Load(xspObj) && playlist.SaveAsJson(xsp, false);
     }
   };
 }

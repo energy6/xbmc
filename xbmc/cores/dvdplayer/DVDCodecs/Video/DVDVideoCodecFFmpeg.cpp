@@ -29,7 +29,6 @@
 #include "DVDClock.h"
 #include "DVDCodecs/DVDCodecs.h"
 #include "DVDCodecs/DVDCodecUtils.h"
-#include "../../../../utils/Win32Exception.h"
 #if defined(_LINUX) || defined(_WIN32)
 #include "utils/CPUInfo.h"
 #endif
@@ -138,6 +137,7 @@ CDVDVideoCodecFFmpeg::CDVDVideoCodecFFmpeg() : CDVDVideoCodec()
 
   m_iScreenWidth = 0;
   m_iScreenHeight = 0;
+  m_iOrientation = 0;
   m_bSoftware = false;
   m_pHardware = NULL;
   m_iLastKeyframe = 0;
@@ -251,7 +251,7 @@ bool CDVDVideoCodecFFmpeg::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options
    * during HW accell */
   m_pCodecContext->thread_type = FF_THREAD_SLICE;
 
-#if defined(__APPLE__) && defined(__arm__)
+#if defined(TARGET_DARWIN_IOS)
   // ffmpeg with enabled neon will crash and burn if this is enabled
   m_pCodecContext->flags &= CODEC_FLAG_EMU_EDGE;
 #else
@@ -366,6 +366,24 @@ unsigned int CDVDVideoCodecFFmpeg::SetFilters(unsigned int flags)
 
   if(m_pHardware)
     return 0;
+
+  if(flags & FILTER_ROTATE)
+  {
+    switch(m_iOrientation)
+    {
+      case 90:
+        m_filters_next += "transpose=1";
+        break;
+      case 180:
+        m_filters_next += "vflip,hflip";
+        break;
+      case 270:  
+        m_filters_next += "transpose=2";
+        break;
+      default:
+        break;
+      }
+  }
 
   if(flags & FILTER_DEINTERLACE_YADIF)
   {
@@ -777,10 +795,18 @@ int CDVDVideoCodecFFmpeg::FilterProcess(AVFrame* frame)
 
   if (frame)
   {
+#if LIBAVFILTER_VERSION_INT < AV_VERSION_INT(3,0,0)
     result = m_dllAvFilter.av_vsrc_buffer_add_frame(m_pFilterIn, frame, 0);
+#else
+    result = m_dllAvFilter.av_buffersrc_add_frame(m_pFilterIn, frame, 0);
+#endif
     if (result < 0)
     {
+#if LIBAVFILTER_VERSION_INT < AV_VERSION_INT(3,0,0)
       CLog::Log(LOGERROR, "CDVDVideoCodecFFmpeg::FilterProcess - av_vsrc_buffer_add_frame");
+#else
+      CLog::Log(LOGERROR, "CDVDVideoCodecFFmpeg::FilterProcess - av_buffersrc_add_frame");
+#endif
       return VC_ERROR;
     }
   }
@@ -793,7 +819,7 @@ int CDVDVideoCodecFFmpeg::FilterProcess(AVFrame* frame)
 
   if ((frames = m_dllAvFilter.av_buffersink_poll_frame(m_pFilterOut)) < 0)
   {
-    CLog::Log(LOGERROR, "CDVDVideoCodecFFmpeg::FilterProcess - avfilter_poll_frame");
+    CLog::Log(LOGERROR, "CDVDVideoCodecFFmpeg::FilterProcess - av_buffersink_poll_frame");
     return VC_ERROR;
   }
 

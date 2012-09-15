@@ -30,6 +30,7 @@
 #include "settings/AdvancedSettings.h"
 #include "Util.h"
 #include "URL.h"
+#include "utils/URIUtils.h"
 
 using namespace XFILE;
 using namespace JSONRPC;
@@ -170,7 +171,7 @@ JSONRPC_STATUS CFileOperations::GetDirectory(const CStdString &method, ITranspor
     bool hasFileField = false;
     for (CVariant::const_iterator_array itr = param["properties"].begin_array(); itr != param["properties"].end_array(); itr++)
     {
-      if (*itr == CVariant("file"))
+      if (itr->asString().compare("file") == 0)
       {
         hasFileField = true;
         break;
@@ -201,6 +202,46 @@ JSONRPC_STATUS CFileOperations::GetDirectory(const CStdString &method, ITranspor
   }
 
   return InvalidParams;
+}
+
+JSONRPC_STATUS CFileOperations::GetFileDetails(const CStdString &method, ITransportLayer *transport, IClient *client, const CVariant &parameterObject, CVariant &result)
+{
+  CStdString file = parameterObject["file"].asString();
+  if (!CFile::Exists(file))
+    return InvalidParams;
+
+  CStdString path;
+  URIUtils::GetDirectory(file, path);
+
+  CFileItemList items;
+  if (path.empty() || !CDirectory::GetDirectory(path, items) || !items.Contains(file))
+    return InvalidParams;
+
+  CFileItemPtr item = items.Get(file);
+  FillFileItem(item, *item.get(), parameterObject["media"].asString());
+
+  // Check if the "properties" list exists
+  // and make sure it contains the "file"
+  // field
+  CVariant param = parameterObject;
+  if (!param.isMember("properties"))
+    param["properties"] = CVariant(CVariant::VariantTypeArray);
+
+  bool hasFileField = false;
+  for (CVariant::const_iterator_array itr = param["properties"].begin_array(); itr != param["properties"].end_array(); itr++)
+  {
+    if (itr->asString().compare("file") == 0)
+    {
+      hasFileField = true;
+      break;
+    }
+  }
+
+  if (!hasFileField)
+    param["properties"].append("file");
+
+  HandleFileItem("id", true, "filedetails", item, parameterObject, param["properties"], result, false);
+  return OK;
 }
 
 JSONRPC_STATUS CFileOperations::PrepareDownload(const CStdString &method, ITransportLayer *transport, IClient *client, const CVariant &parameterObject, CVariant &result)
@@ -240,17 +281,22 @@ bool CFileOperations::FillFileItem(const CFileItemPtr &originalItem, CFileItem &
     else if (media.Equals("music"))
       status = CAudioLibrary::FillFileItem(strFilename, item);
 
-    if (!status && originalItem->GetLabel().empty())
+    if (!status)
     {
       bool isDir = CDirectory::Exists(strFilename);
-      CStdString label = CUtil::GetTitleFromPath(strFilename, isDir);
-      if (!label.empty())
+      if (originalItem->GetLabel().empty())
       {
+        CStdString label = CUtil::GetTitleFromPath(strFilename, isDir);
+        if (label.empty())
+          return false;
+
         item = CFileItem(strFilename, isDir);
         item.SetLabel(label);
-
-        status = true;
       }
+      else
+        item = *originalItem.get();
+
+      status = true;
     }
   }
 
@@ -290,7 +336,7 @@ bool CFileOperations::FillFileItemList(const CVariant &parameterObject, CFileIte
       CDirectory directory;
       if (directory.GetDirectory(strPath, items, extensions))
       {
-        items.Sort(SORT_METHOD_FILE, SORT_ORDER_ASC);
+        items.Sort(SORT_METHOD_FILE, SortOrderAscending);
         CFileItemList filteredDirectories;
         for (unsigned int i = 0; i < (unsigned int)items.Size(); i++)
         {

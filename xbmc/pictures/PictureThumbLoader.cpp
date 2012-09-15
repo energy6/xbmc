@@ -21,7 +21,6 @@
 
 #include "PictureThumbLoader.h"
 #include "Picture.h"
-#include "URL.h"
 #include "filesystem/File.h"
 #include "FileItem.h"
 #include "TextureCache.h"
@@ -206,7 +205,7 @@ void CPictureThumbLoader::ProcessFoldersAndArchives(CFileItem *pItem)
 
       if (items.Size() < 4 || pItem->IsCBR() || pItem->IsCBZ())
       { // less than 4 items, so just grab the first thumb
-        items.Sort(SORT_METHOD_LABEL, SORT_ORDER_ASC);
+        items.Sort(SORT_METHOD_LABEL, SortOrderAscending);
         CStdString thumb = CTextureCache::GetWrappedThumbURL(items[0]->GetPath());
         db.SetTextureForPath(pItem->GetPath(), "thumb", thumb);
         CTextureCache::Get().BackgroundCacheImage(thumb);
@@ -225,8 +224,8 @@ void CPictureThumbLoader::ProcessFoldersAndArchives(CFileItem *pItem)
         {
           CTextureDetails details;
           details.file = relativeCacheFile;
-          details.width = g_advancedSettings.m_thumbSize;
-          details.height = g_advancedSettings.m_thumbSize;
+          details.width = g_advancedSettings.GetThumbSize();
+          details.height = g_advancedSettings.GetThumbSize();
           CTextureCache::Get().AddCachedTexture(thumb, details);
           db.SetTextureForPath(pItem->GetPath(), "thumb", thumb);
           pItem->SetThumbnailImage(CTextureCache::GetCachedPath(relativeCacheFile));

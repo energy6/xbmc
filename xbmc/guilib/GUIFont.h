@@ -49,19 +49,15 @@ class CGUIFontTTFBase;
 #define FONT_STYLE_NORMAL       0
 #define FONT_STYLE_BOLD         1
 #define FONT_STYLE_ITALICS      2
-#define FONT_STYLE_BOLD_ITALICS 3
+#define FONT_STYLE_UPPERCASE    4
+#define FONT_STYLE_LOWERCASE    8
+#define FONT_STYLE_MASK       0xF
 
 class CScrollInfo
 {
 public:
-  CScrollInfo(unsigned int wait = 50, float pos = 0, int speed = defaultSpeed, const CStdString &scrollSuffix = " | ")
-  {
-    initialWait = wait;
-    initialPos = pos;
-    SetSpeed(speed ? speed : defaultSpeed);
-    suffix = scrollSuffix;
-    Reset();
-  };
+  CScrollInfo(unsigned int wait = 50, float pos = 0, int speed = defaultSpeed, const CStdString &scrollSuffix = " | ");
+
   void SetSpeed(int speed)
   {
     pixelSpeed = speed * 0.001f;
@@ -95,7 +91,7 @@ public:
   unsigned int characterPos;
   unsigned int initialWait;
   float initialPos;
-  CStdString suffix;
+  CStdStringW suffix;
 
   static const int defaultSpeed = 60;
 private:

@@ -24,7 +24,6 @@
 #include "utils/URIUtils.h"
 #include "PlayListPlayer.h"
 #include "GUIPassword.h"
-#include "dialogs/GUIDialogFileBrowser.h"
 #include "settings/GUIDialogContentSettings.h"
 #include "filesystem/MusicDatabaseDirectory.h"
 #include "filesystem/VideoDatabaseDirectory.h"
@@ -36,19 +35,22 @@
 #include "music/tags/MusicInfoTag.h"
 #include "guilib/GUIWindowManager.h"
 #include "dialogs/GUIDialogOK.h"
-#include "dialogs/GUIDialogKeyboard.h"
+#include "guilib/GUIKeyboardFactory.h"
 #include "dialogs/GUIDialogYesNo.h"
 #include "guilib/GUIEditControl.h"
 #include "GUIUserMessages.h"
 #include "filesystem/File.h"
 #include "FileItem.h"
 #include "Application.h"
+#include "ApplicationMessenger.h"
 #include "settings/Settings.h"
 #include "settings/AdvancedSettings.h"
 #include "guilib/LocalizeStrings.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "TextureCache.h"
+#include "Util.h"
+#include "URL.h"
 
 using namespace std;
 using namespace XFILE;
@@ -162,7 +164,7 @@ bool CGUIWindowMusicNav::OnMessage(CGUIMessage& message)
           return true;
         }
         CStdString search(GetProperty("search").asString());
-        CGUIDialogKeyboard::ShowAndGetFilter(search, true);
+        CGUIKeyboardFactory::ShowAndGetFilter(search, true);
         SetProperty("search", search);
         return true;
       }
@@ -253,7 +255,7 @@ bool CGUIWindowMusicNav::OnClick(int iItem)
     else
     {
       CStdString search(GetProperty("search").asString());
-      CGUIDialogKeyboard::ShowAndGetFilter(search, true);
+      CGUIKeyboardFactory::ShowAndGetFilter(search, true);
       SetProperty("search", search);
     }
     return true;
@@ -264,6 +266,20 @@ bool CGUIWindowMusicNav::OnClick(int iItem)
   return CGUIWindowMusicBase::OnClick(iItem);
 }
 
+bool CGUIWindowMusicNav::Update(const CStdString &strDirectory)
+{
+  if (m_thumbLoader.IsLoading())
+    m_thumbLoader.StopThread();
+
+  if (CGUIWindowMusicBase::Update(strDirectory))
+  {
+    m_thumbLoader.Load(*m_vecItems);
+    return true;
+  }
+
+  return false;
+}
+
 bool CGUIWindowMusicNav::GetDirectory(const CStdString &strDirectory, CFileItemList &items)
 {
   if (m_bDisplayEmptyDatabaseMessage)
@@ -272,19 +288,11 @@ bool CGUIWindowMusicNav::GetDirectory(const CStdString &strDirectory, CFileItemL
   if (strDirectory.IsEmpty())
     AddSearchFolder();
 
-  if (m_thumbLoader.IsLoading())
-    m_thumbLoader.StopThread();
-
   bool bResult = CGUIWindowMusicBase::GetDirectory(strDirectory, items);
   if (bResult)
   {
     if (items.IsPlayList())
       OnRetrieveMusicInfo(items);
-    if (!items.IsMusicDb())
-    {
-      items.SetCachedMusicThumbs();
-      m_thumbLoader.Load(*m_vecItems);
-    }
   }
 
   // update our content in the info manager
@@ -317,7 +325,7 @@ bool CGUIWindowMusicNav::GetDirectory(const CStdString &strDirectory, CFileItemL
     else if (node == NODE_TYPE_YEAR)
       items.SetContent("years");
   }
-  else if (strDirectory.Equals("special://musicplaylists"))
+  else if (strDirectory.Equals("special://musicplaylists/"))
     items.SetContent("playlists");
   else if (strDirectory.Equals("plugin://music/"))
     items.SetContent("plugins");
@@ -635,7 +643,7 @@ bool CGUIWindowMusicNav::OnContextButton(int itemNumber, CONTEXT_BUTTON button)
       database.Open();
       CVideoInfoTag details;
       database.GetMusicVideoInfo("",details,database.GetMatchingMusicVideo(StringUtils::Join(item->GetMusicInfoTag()->GetArtist(), g_advancedSettings.m_musicItemSeparator),item->GetMusicInfoTag()->GetAlbum(),item->GetMusicInfoTag()->GetTitle()));
-      g_application.getApplicationMessenger().PlayFile(CFileItem(details));
+      CApplicationMessenger::Get().PlayFile(CFileItem(details));
       return true;
     }
 
@@ -793,8 +801,6 @@ void CGUIWindowMusicNav::FrameMove()
 void CGUIWindowMusicNav::OnPrepareFileItems(CFileItemList &items)
 {
   CGUIWindowMusicBase::OnPrepareFileItems(items);
-  // set fanart
-  SetupFanart(items);
 }
 
 void CGUIWindowMusicNav::AddSearchFolder()

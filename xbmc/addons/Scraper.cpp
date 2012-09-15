@@ -39,6 +39,9 @@
 #include "video/VideoDatabase.h"
 #include "music/Album.h"
 #include "music/Artist.h"
+#include "Util.h"
+#include "URL.h"
+
 #include <sstream>
 
 using namespace std;
@@ -285,6 +288,12 @@ vector<CStdString> CScraper::Run(const CStdString& function,
       }
       else
         scrURL2.ParseElement(xchain);
+      // Fix for empty chains. $$1 would still contain the
+      // previous value as there is no child of the xml node. 
+      // since $$1 will always either contain the data from an 
+      // url or the parameters to a chain, we can safely clear it here
+      // to fix this issue
+      m_parser.m_param[0].clear();
       vector<CStdString> result2 = RunNoThrow(szFunction,scrURL2,http,&extras);
       result.insert(result.end(),result2.begin(),result2.end());
     }
@@ -758,7 +767,8 @@ std::vector<CMusicArtistInfo> CScraper::FindArtist(CCurlFile &fcurl,
         CMusicArtistInfo ari(pxnTitle->FirstChild()->Value(), scurlArtist);
         CStdString genre;
         XMLUtils::GetString(pxeArtist, "genre", genre);
-        ari.GetArtist().genre = StringUtils::Split(genre, g_advancedSettings.m_musicItemSeparator);
+        if (!genre.empty())
+          ari.GetArtist().genre = StringUtils::Split(genre, g_advancedSettings.m_musicItemSeparator);
         XMLUtils::GetString(pxeArtist, "year", ari.GetArtist().strBorn);
 
         vcari.push_back(ari);
@@ -824,25 +834,6 @@ EPISODELIST CScraper::GetEpisodeList(XFILE::CCurlFile &fcurl, const CScraperUrl 
         vcep.push_back(ep);
       }
     }
-  }
-
-  // find minimum in each season
-  map<int, int> mpMin;
-  for (EPISODELIST::const_iterator i = vcep.begin(); i != vcep.end(); ++i)
-  {
-    map<int, int>::iterator iMin = mpMin.find(i->key.first);
-    if (iMin == mpMin.end())
-      mpMin.insert(i->key);
-    else if (i->key.second < iMin->second)
-      iMin->second = i->key.second;
-  }
-
-  // correct episode numbers
-  for (EPISODELIST::iterator i = vcep.begin(); i != vcep.end(); ++i)
-  {
-    i->key.second -= mpMin[i->key.first];
-    if (mpMin[i->key.first] > 0)
-      ++i->key.second;
   }
 
   return vcep;

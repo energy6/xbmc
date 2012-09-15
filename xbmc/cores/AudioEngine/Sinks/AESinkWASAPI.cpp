@@ -85,10 +85,11 @@ struct sampleFormat
   AEDataFormat subFormatType;
 };
 
-//Sample formats go from float -> 32 bit int -> 24 bit int (packed in 32) -> 16 bit int
+//Sample formats go from float -> 32 bit int -> 24 bit int (packed in 32) -> -> 24 bit int -> 16 bit int
 static const sampleFormat testFormats[] = { {KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, 32, 32, AE_FMT_FLOAT},
                                             {KSDATAFORMAT_SUBTYPE_PCM, 32, 32, AE_FMT_S32NE},
                                             {KSDATAFORMAT_SUBTYPE_PCM, 32, 24, AE_FMT_S24NE4},
+                                            {KSDATAFORMAT_SUBTYPE_PCM, 24, 24, AE_FMT_S24NE3},
                                             {KSDATAFORMAT_SUBTYPE_PCM, 16, 16, AE_FMT_S16NE} };
 
 struct winEndpointsToAEDeviceType
@@ -275,19 +276,29 @@ failed:
 
 void CAESinkWASAPI::Deinitialize()
 {
-  if (!m_initialized)
+  if (!m_initialized && !m_isDirty)
     return;
 
-
   if (m_running)
+  {
+    try
+    {
     m_pAudioClient->Stop();
+    }
+    catch (...)
+    {
+      CLog::Log(LOGDEBUG, __FUNCTION__, "Invalidated AudioClient - Releasing");
+    }
+  }
   m_running = false;
 
+  CloseHandle(m_needDataEvent);
+
+  Sleep((DWORD)(m_sinkLatency * 1.1 * 1000.0)); //let buffers drain
 
   SAFE_RELEASE(m_pRenderClient);
   SAFE_RELEASE(m_pAudioClient);
   SAFE_RELEASE(m_pDevice);
-  CloseHandle(m_needDataEvent);
 
   m_initialized = false;
 }
@@ -332,31 +343,26 @@ bool CAESinkWASAPI::IsCompatible(const AEAudioFormat format, const std::string d
 
 double CAESinkWASAPI::GetDelay()
 {
-  HRESULT hr;
   if (!m_initialized)
     return 0.0;
 
-  hr = m_pAudioClient->GetBufferSize(&m_uiBufferLen);
-  if (FAILED(hr))
-  {
-    #ifdef _DEBUG
-    CLog::Log(LOGERROR, __FUNCTION__": GetBufferSize Failed : %s", WASAPIErrToStr(hr));
-    #endif
-    return 0.0;
-  }
-  return (double)m_uiBufferLen / (double)m_format.m_sampleRate;
+  return m_sinkLatency;
 }
 
 double CAESinkWASAPI::GetCacheTime()
 {
+  /* This function deviates from the defined usage due to the event-driven */
+  /* mode of WASAPI utilizing twin buffers which are written to in single  */
+  /* buffer chunks. Therefore the buffers are either 100% full or 50% full */
+  /* At 50% issues arise with water levels in the stream and player. For   */
+  /* this reason the cache is shown as 100% full at all times, and control */
+  /* of the buffer filling is assumed in AddPackets() and by the WASAPI    */
+  /* implementation of the WaitforSingleObject event indicating one of the */
+  /* buffers is ready for filling via AddPackets                           */
   if (!m_initialized)
     return 0.0;
 
-  REFERENCE_TIME hnsLatency;
-  HRESULT hr = m_pAudioClient->GetStreamLatency(&hnsLatency);
-
-  /** returns buffer duration in seconds */
-  return hnsLatency / 10.0;
+  return m_sinkLatency;
 }
 
 double CAESinkWASAPI::GetCacheTotal()
@@ -364,14 +370,10 @@ double CAESinkWASAPI::GetCacheTotal()
   if (!m_initialized)
     return 0.0;
 
-  REFERENCE_TIME hnsLatency;
-  HRESULT hr = m_pAudioClient->GetStreamLatency(&hnsLatency);
-
-  /** returns buffer duration in seconds */
-  return hnsLatency / 10.0;
+  return m_sinkLatency;
 }
 
-unsigned int CAESinkWASAPI::AddPackets(uint8_t *data, unsigned int frames)
+unsigned int CAESinkWASAPI::AddPackets(uint8_t *data, unsigned int frames, bool hasAudio)
 {
   if (!m_initialized)
     return 0;
@@ -424,16 +426,24 @@ unsigned int CAESinkWASAPI::AddPackets(uint8_t *data, unsigned int frames)
 
   /* Wait for Audio Driver to tell us it's got a buffer available */
   DWORD eventAudioCallback = WaitForSingleObject(m_needDataEvent, 1100);
-  if (eventAudioCallback != WAIT_OBJECT_0)
+
+  if (eventAudioCallback != WAIT_OBJECT_0 || !&buf)
   {
-    // Event handle timed out - stop audio device
-    m_pAudioClient->Stop();
+    // Event handle timed out - flag sink as dirty for re-initializing
     CLog::Log(LOGERROR, __FUNCTION__": Endpoint Buffer timed out");
+    if (g_advancedSettings.m_streamSilence)
+    {
+      m_isDirty = true; //flag new device or re-init needed
+      Deinitialize();
+      m_running = false;
+      return INT_MAX;
+    }
     m_running = false;
-    m_pAudioClient->Stop(); //stop processing - we're done
-    m_isDirty = true; //flag new device or re-init needed
-    return INT_MAX;
+    return 0;
   }
+
+  if (!m_running)
+    return 0;
 
 #ifndef _DEBUG
   QueryPerformanceCounter(&timerStop);
@@ -1093,7 +1103,15 @@ initialize:
     CLog::Log(LOGERROR, __FUNCTION__": Unable to initialize WASAPI in exclusive mode %d - (%s).", HRESULT(hr), WASAPIErrToStr(hr));
     return false;
   }
+
+  /* Latency of WASAPI buffers in event-driven mode is equal to the returned value */
+  /* of GetStreamLatency converted from 100ns intervals to seconds then multiplied */
+  /* by two as there are two equally-sized buffers and playback starts when the    */
+  /* second buffer is filled. Multiplying the returned 100ns intervals by 0.0000002*/
+  /* is handles both the unit conversion and twin buffers.                         */
   hr = m_pAudioClient->GetStreamLatency(&hnsLatency);
+  m_sinkLatency = hnsLatency * 0.0000002;
+
   CLog::Log(LOGDEBUG,  __FUNCTION__": Requested Duration of Buffer : %fmsec", hnsLatency / 10000.0);
   CLog::Log(LOGNOTICE, __FUNCTION__": WASAPI Exclusive Mode Sink Initialized Successfully!!!");
   return true;

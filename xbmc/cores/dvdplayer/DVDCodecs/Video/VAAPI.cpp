@@ -44,6 +44,10 @@ do { \
     CLog::Log(LOGWARNING, "VAAPI - failed executing "#a" at line %d with error %x:%s", __LINE__, res, vaErrorStr(res)); \
 } while(0);
 
+#ifndef VA_SURFACE_ATTRIB_SETTABLE
+#define vaCreateSurfaces(d, f, w, h, s, ns, a, na) \
+    vaCreateSurfaces(d, w, h, f, ns, s)
+#endif
 
 using namespace std;
 using namespace boost;
@@ -145,6 +149,7 @@ CDecoder::CDecoder()
   m_config          = 0;
   m_context         = 0;
   m_hwaccel         = (vaapi_context*)calloc(1, sizeof(vaapi_context));
+  memset(m_surfaces, 0, sizeof(*m_surfaces));
 }
 
 CDecoder::~CDecoder()
@@ -181,7 +186,7 @@ int CDecoder::GetBuffer(AVCodecContext *avctx, AVFrame *pic)
   {
     /* reget call */
     for(; it != m_surfaces_free.end(); it++)
-    {    
+    {
       if((*it)->m_id == surface)
       {
         wrapper = it->get();
@@ -190,10 +195,10 @@ int CDecoder::GetBuffer(AVCodecContext *avctx, AVFrame *pic)
         break;
       }
     }
-    if(it == m_surfaces_free.end())
+    if(!wrapper)
     {
       CLog::Log(LOGERROR, "VAAPI - unable to find requested surface");
-      return -1;      
+      return -1; 
     }
   }
   else
@@ -398,11 +403,13 @@ bool CDecoder::EnsureSurfaces(AVCodecContext *avctx, unsigned n_surfaces_count)
   m_surfaces_count = n_surfaces_count;
 
   CHECK(vaCreateSurfaces(m_display->get()
+                       , VA_RT_FORMAT_YUV420
                        , avctx->width
                        , avctx->height
-                       , VA_RT_FORMAT_YUV420
+                       , &m_surfaces[old_surfaces_count]
                        , m_surfaces_count - old_surfaces_count
-                       , &m_surfaces[old_surfaces_count]))
+                       , NULL
+                       , 0))
 
   for(unsigned i = old_surfaces_count; i < m_surfaces_count; i++)
     m_surfaces_free.push_back(CSurfacePtr(new CSurface(m_surfaces[i], m_display)));

@@ -20,15 +20,28 @@
  */
 
 #include "CPUInfo.h"
+#include "Temperature.h"
 #include <string>
 #include <string.h>
 
-#ifdef __APPLE__
+#if defined(TARGET_DARWIN)
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #ifdef __ppc__
 #include <mach-o/arch.h>
 #endif
+#endif
+
+#if defined(TARGET_LINUX) && defined(__ARM_NEON__) && !defined(TARGET_ANDROID)
+#include <fcntl.h>
+#include <unistd.h>
+#include <elf.h>
+#include <linux/auxvec.h>
+#include <asm/hwcap.h>
+#endif
+
+#if defined(TARGET_ANDROID)
+#include "android/activity/AndroidFeatures.h"
 #endif
 
 #ifdef _WIN32
@@ -70,8 +83,8 @@
 
 using namespace std;
 
-// In seconds
-#define MINIMUM_TIME_BETWEEN_READS 2
+// In milliseconds
+#define MINIMUM_TIME_BETWEEN_READS 500
 
 #ifdef _WIN32
 /* replacement gettimeofday implementation, copy from dvdnav_internal.h */
@@ -93,7 +106,7 @@ CCPUInfo::CCPUInfo(void)
   m_lastUsedPercentage = 0;
   m_cpuFeatures = 0;
 
-#ifdef __APPLE__
+#if defined(TARGET_DARWIN)
   size_t len = 4;
 
   // The number of cores.
@@ -238,14 +251,18 @@ CCPUInfo::CCPUInfo(void)
     m_cpuModel = "Unknown";
   }
 
-  readProcStat(m_userTicks, m_niceTicks, m_systemTicks, m_idleTicks, m_ioTicks);
 #endif
+  readProcStat(m_userTicks, m_niceTicks, m_systemTicks, m_idleTicks, m_ioTicks);
+  m_nextUsedReadTime.Set(MINIMUM_TIME_BETWEEN_READS);
 
   ReadCPUFeatures();
 
   // Set MMX2 when SSE is present as SSE is a superset of MMX2 and Intel doesn't set the MMX2 cap
   if (m_cpuFeatures & CPU_FEATURE_SSE)
     m_cpuFeatures |= CPU_FEATURE_MMX2;
+
+  if (HasNeon())
+    m_cpuFeatures |= CPU_FEATURE_NEON;
 
 }
 
@@ -263,10 +280,8 @@ CCPUInfo::~CCPUInfo()
 
 int CCPUInfo::getUsedPercentage()
 {
-  if (m_lastReadTime + MINIMUM_TIME_BETWEEN_READS > time(NULL))
-  {
+  if (!m_nextUsedReadTime.IsTimePast())
     return m_lastUsedPercentage;
-  }
 
   unsigned long long userTicks;
   unsigned long long niceTicks;
@@ -275,9 +290,7 @@ int CCPUInfo::getUsedPercentage()
   unsigned long long ioTicks;
 
   if (!readProcStat(userTicks, niceTicks, systemTicks, idleTicks, ioTicks))
-  {
-    return 0;
-  }
+    return m_lastUsedPercentage;
 
   userTicks -= m_userTicks;
   niceTicks -= m_niceTicks;
@@ -302,6 +315,7 @@ int CCPUInfo::getUsedPercentage()
   m_ioTicks += ioTicks;
 
   m_lastUsedPercentage = result;
+  m_nextUsedReadTime.Set(MINIMUM_TIME_BETWEEN_READS);
 
   return result;
 }
@@ -309,7 +323,7 @@ int CCPUInfo::getUsedPercentage()
 float CCPUInfo::getCPUFrequency()
 {
   // Get CPU frequency, scaled to MHz.
-#ifdef __APPLE__
+#if defined(TARGET_DARWIN)
   long long hz = 0;
   size_t len = sizeof(hz);
   if (sysctlbyname("hw.cpufrequency", &hz, &len, NULL, 0) == -1)
@@ -323,9 +337,7 @@ float CCPUInfo::getCPUFrequency()
   ret = RegQueryValueEx(hKey,"~MHz", NULL, NULL, (LPBYTE)&dwMHz, &dwSize);
   RegCloseKey(hKey);
   if(ret == 0)
-  {
     return float(dwMHz);
-  }
   else
     return 0.f;
 #else
@@ -347,7 +359,7 @@ float CCPUInfo::getCPUFrequency()
 #endif
 }
 
-CTemperature CCPUInfo::getTemperature()
+bool CCPUInfo::getTemperature(CTemperature& temperature)
 {
   int         value = 0,
               ret   = 0;
@@ -355,8 +367,10 @@ CTemperature CCPUInfo::getTemperature()
   FILE        *p    = NULL;
   CStdString  cmd   = g_advancedSettings.m_cpuTempCmd;
 
+  temperature.SetState(CTemperature::invalid);
+
   if (cmd.IsEmpty() && m_fProcTemperature == NULL)
-    return CTemperature();
+    return false;
 
   if (!cmd.IsEmpty())
   {
@@ -388,13 +402,16 @@ CTemperature CCPUInfo::getTemperature()
   }
 
   if (ret != 2)
-    return CTemperature();
+    return false; 
 
   if (scale == 'C' || scale == 'c')
-    return CTemperature::CreateFromCelsius(value);
-  if (scale == 'F' || scale == 'f')
-    return CTemperature::CreateFromFahrenheit(value);
-  return CTemperature();
+    temperature = CTemperature::CreateFromCelsius(value);
+  else if (scale == 'F' || scale == 'f')
+    temperature = CTemperature::CreateFromFahrenheit(value);
+  else
+    return false;
+  
+  return true;
 }
 
 bool CCPUInfo::HasCoreId(int nCoreId) const
@@ -483,7 +500,10 @@ bool CCPUInfo::readProcStat(unsigned long long& user, unsigned long long& nice,
       coreIO -= iter->second.m_io;
 
       double total = (double)(coreUser + coreNice + coreSystem + coreIdle + coreIO);
-      iter->second.m_fPct = ((double)(coreUser + coreNice + coreSystem) * 100.0) / total;
+      if(total == 0.0f)
+        iter->second.m_fPct = 0.0f;
+      else
+        iter->second.m_fPct = ((double)(coreUser + coreNice + coreSystem) * 100.0) / total;
 
       iter->second.m_user += coreUser;
       iter->second.m_nice += coreNice;
@@ -494,7 +514,6 @@ bool CCPUInfo::readProcStat(unsigned long long& user, unsigned long long& nice,
   }
 #endif
 
-  m_lastReadTime = time(NULL);
   return true;
 }
 
@@ -562,10 +581,10 @@ void CCPUInfo::ReadCPUFeatures()
       m_cpuFeatures |= CPU_FEATURE_3DNOWEXT;
   }
 
-#elif defined(__APPLE__)
+#elif defined(TARGET_DARWIN)
   #if defined(__ppc__)
     m_cpuFeatures |= CPU_FEATURE_ALTIVEC;
-  #elif defined(__arm__)
+  #elif defined(TARGET_DARWIN_IOS)
   #else
     size_t len = 512;
     char buffer[512] ={0};
@@ -604,8 +623,44 @@ void CCPUInfo::ReadCPUFeatures()
 #endif
 }
 
-CCPUInfo g_cpuInfo;
+bool CCPUInfo::HasNeon()
+{
+  static int has_neon = -1;
+#if defined (TARGET_ANDROID)
+  if (has_neon == -1)
+    has_neon = (CAndroidFeatures::HasNeon()) ? 1 : 0;
 
+#elif defined(TARGET_DARWIN_IOS)
+  has_neon = 1;
+
+#elif defined(TARGET_LINUX) && defined(__ARM_NEON__)
+  if (has_neon == -1)
+  {
+    has_neon = 0;
+    // why are we not looking at the Features in
+    // /proc/cpuinfo for neon ?
+    int fd = open("/proc/self/auxv", O_RDONLY);
+    if (fd >= 0)
+    {
+      Elf32_auxv_t auxv;
+      while (read(fd, &auxv, sizeof(Elf32_auxv_t)) == sizeof(Elf32_auxv_t))
+      {
+        if (auxv.a_type == AT_HWCAP)
+        {
+          has_neon = (auxv.a_un.a_val & HWCAP_NEON) ? 1 : 0;
+          break;
+        }
+      }
+      close(fd);
+    }
+  }
+
+#endif
+
+  return has_neon == 1;
+}
+
+CCPUInfo g_cpuInfo;
 /*
 int main()
 {

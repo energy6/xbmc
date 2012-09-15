@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2005-2009 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -21,6 +21,7 @@
 
 #include "GUIDialogPVRChannelsOSD.h"
 #include "Application.h"
+#include "ApplicationMessenger.h"
 #include "FileItem.h"
 #include "guilib/GUIWindowManager.h"
 #include "dialogs/GUIDialogOK.h"
@@ -33,6 +34,7 @@
 #include "pvr/channels/PVRChannelGroupsContainer.h"
 #include "epg/Epg.h"
 #include "pvr/timers/PVRTimerInfoTag.h"
+#include "pvr/channels/PVRChannelGroupsContainer.h"
 
 using namespace std;
 using namespace PVR;
@@ -103,6 +105,28 @@ bool CGUIDialogPVRChannelsOSD::OnMessage(CGUIMessage& message)
       }
     }
     break;
+
+  case GUI_MSG_MOVE:
+    {
+      int iAction = message.GetParam1();
+
+      if (iAction == ACTION_MOVE_RIGHT || iAction == ACTION_MOVE_LEFT)
+      {
+          CPVRChannelPtr channel;
+        g_PVRManager.GetCurrentChannel(channel);
+
+        CPVRChannelGroupPtr group = g_PVRManager.GetPlayingGroup(channel->IsRadio());
+        CPVRChannelGroupPtr nextGroup = iAction == ACTION_MOVE_RIGHT ? group->GetNextGroup() : group->GetPreviousGroup();
+
+        g_PVRManager.SetPlayingGroup(nextGroup);
+
+        Clear();
+        Update();
+
+        return true;
+      }
+    }
+    break;
   }
 
   return CGUIDialog::OnMessage(message);
@@ -121,15 +145,15 @@ void CGUIDialogPVRChannelsOSD::Update()
   // empty the list ready for population
   Clear();
 
-  CPVRChannel channel;
+  CPVRChannelPtr channel;
   g_PVRManager.GetCurrentChannel(channel);
-  const CPVRChannelGroup *group = g_PVRManager.GetPlayingGroup(channel.IsRadio());
+  CPVRChannelGroupPtr group = g_PVRManager.GetPlayingGroup(channel->IsRadio());
 
   if (group)
   {
     group->GetMembers(*m_vecItems);
     m_viewControl.SetItems(*m_vecItems);
-    m_viewControl.SetSelectedItem(group->GetIndex(channel));
+    m_viewControl.SetSelectedItem(group->GetIndex(*channel));
   }
 
   g_graphicsContext.Unlock();
@@ -163,14 +187,16 @@ void CGUIDialogPVRChannelsOSD::GotoChannel(int item)
 
   if (g_PVRManager.IsPlaying() && pItem->HasPVRChannelInfoTag() && g_application.m_pPlayer)
   {
-    if (!g_application.m_pPlayer->SwitchChannel(*pItem->GetPVRChannelInfoTag()))
+    CPVRChannel *channel = pItem->GetPVRChannelInfoTag();
+    if (!g_PVRManager.CheckParentalLock(*channel) ||
+        !g_application.m_pPlayer->SwitchChannel(*channel))
     {
       Close(true);
       return;
     }
   }
   else
-    g_application.getApplicationMessenger().PlayFile(*pItem);
+    CApplicationMessenger::Get().PlayFile(*pItem);
 
   CloseOrSelect(item);
 }
@@ -183,9 +209,13 @@ void CGUIDialogPVRChannelsOSD::ShowInfo(int item)
   CFileItemPtr pItem = m_vecItems->Get(item);
   if (pItem && pItem->IsPVRChannel())
   {
+    CPVRChannel *channel = pItem->GetPVRChannelInfoTag();
+    if (!g_PVRManager.CheckParentalLock(*channel))
+      return;
+
     /* Get the current running show on this channel from the EPG storage */
     CEpgInfoTag epgnow;
-    if (!pItem->GetPVRChannelInfoTag()->GetEPGNow(epgnow))
+    if (!channel->GetEPGNow(epgnow))
       return;
     CFileItem *itemNow  = new CFileItem(epgnow);
 
@@ -225,9 +255,9 @@ CGUIControl *CGUIDialogPVRChannelsOSD::GetFirstFocusableControl(int id)
   return CGUIWindow::GetFirstFocusableControl(id);
 }
 
-void CGUIDialogPVRChannelsOSD::Notify(const Observable &obs, const CStdString& msg)
+void CGUIDialogPVRChannelsOSD::Notify(const Observable &obs, const ObservableMessage msg)
 {
-  if (msg.Equals("current-item"))
+  if (msg == ObservableMessageCurrentItem)
   {
     g_graphicsContext.Lock();
     m_viewControl.SetItems(*m_vecItems);

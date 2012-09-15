@@ -21,9 +21,15 @@
 
 #include "GUIDialogVideoOSD.h"
 #include "Application.h"
+#include "FileItem.h"
 #include "GUIUserMessages.h"
 #include "guilib/GUIWindowManager.h"
 #include "input/MouseStat.h"
+
+#include "pvr/PVRManager.h"
+#include "pvr/channels/PVRChannelGroupsContainer.h"
+
+using namespace PVR;
 
 CGUIDialogVideoOSD::CGUIDialogVideoOSD(void)
     : CGUIDialog(WINDOW_DIALOG_VIDEO_OSD, "VideoOSD.xml")

@@ -25,6 +25,12 @@
 #include "PlatformDefs.h"
 #include <math.h>
 
+#ifdef TARGET_WINDOWS
+#if _M_IX86_FP>0 && !defined(__SSE__)
+#define __SSE__
+#endif
+#endif
+
 #ifdef __SSE__
 #include <xmmintrin.h>
 #else
@@ -90,4 +96,6 @@ public:
   */
   static float FloatRand1(const float min, const float max);
   static void  FloatRand4(const float min, const float max, float result[4], __m128 *sseresult = NULL);
+
+  static bool S16NeedsByteSwap(AEDataFormat in, AEDataFormat out);
 };

@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2005-2010 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -231,20 +231,8 @@ int CEpgDatabase::Get(CEpgContainer &container)
         CStdString strName        = m_pDS->fv("sName").get_asString().c_str();
         CStdString strScraperName = m_pDS->fv("sScraperName").get_asString().c_str();
 
-        CEpg newEpg(iEpgID, strName, strScraperName, true);
-        if (container.UpdateEntry(newEpg))
-          ++iReturn;
-        else
-        {
-          CLog::Log(LOGERROR, "%s - deleting EPG table %d from the database",
-              __FUNCTION__, iEpgID);
-
-          CStdString strWhereClause = FormatSQL("idEpg = %u", iEpgID);
-          DeleteValues("lastepgscan", strWhereClause);
-          DeleteValues("epgtags", strWhereClause);
-          DeleteValues("epg", strWhereClause);
-        }
-
+        container.InsertFromDatabase(iEpgID, strName, strScraperName);
+        ++iReturn;
         m_pDS->next();
       }
       m_pDS->close();
@@ -391,7 +379,7 @@ int CEpgDatabase::Persist(const CEpgInfoTag &tag, bool bSingleUpdate /* = true *
 
   if (tag.EpgID() <= 0)
   {
-    CLog::Log(LOGERROR, "%s - tag '%s' does not have a valid table", __FUNCTION__, tag.Title().c_str());
+    CLog::Log(LOGERROR, "%s - tag '%s' does not have a valid table", __FUNCTION__, tag.Title(true).c_str());
     return iReturn;
   }
 
@@ -415,7 +403,7 @@ int CEpgDatabase::Persist(const CEpgInfoTag &tag, bool bSingleUpdate /* = true *
         "iEpisodeId, iEpisodePart, sEpisodeName, iBroadcastUid) "
         "VALUES (%u, %u, %u, '%s', '%s', '%s', %i, %i, '%s', %u, %i, %i, %i, %i, %i, %i, '%s', %i);",
         tag.EpgID(), iStartTime, iEndTime,
-        tag.Title().c_str(), tag.PlotOutline().c_str(), tag.Plot().c_str(), tag.GenreType(), tag.GenreSubType(), strGenre.c_str(),
+        tag.Title(true).c_str(), tag.PlotOutline(true).c_str(), tag.Plot(true).c_str(), tag.GenreType(), tag.GenreSubType(), strGenre.c_str(),
         iFirstAired, tag.ParentalRating(), tag.StarRating(), tag.Notify(),
         tag.SeriesNum(), tag.EpisodeNum(), tag.EpisodePart(), tag.EpisodeName().c_str(),
         tag.UniqueBroadcastID());
@@ -428,7 +416,7 @@ int CEpgDatabase::Persist(const CEpgInfoTag &tag, bool bSingleUpdate /* = true *
         "iEpisodeId, iEpisodePart, sEpisodeName, iBroadcastUid, idBroadcast) "
         "VALUES (%u, %u, %u, '%s', '%s', '%s', %i, %i, '%s', %u, %i, %i, %i, %i, %i, %i, '%s', %i, %i);",
         tag.EpgID(), iStartTime, iEndTime,
-        tag.Title().c_str(), tag.PlotOutline().c_str(), tag.Plot().c_str(), tag.GenreType(), tag.GenreSubType(), strGenre.c_str(),
+        tag.Title(true).c_str(), tag.PlotOutline(true).c_str(), tag.Plot(true).c_str(), tag.GenreType(), tag.GenreSubType(), strGenre.c_str(),
         iFirstAired, tag.ParentalRating(), tag.StarRating(), tag.Notify(),
         tag.SeriesNum(), tag.EpisodeNum(), tag.EpisodePart(), tag.EpisodeName().c_str(),
         tag.UniqueBroadcastID(), iBroadcastId);

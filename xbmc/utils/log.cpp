@@ -27,6 +27,9 @@
 #include "threads/SingleLock.h"
 #include "threads/Thread.h"
 #include "utils/StdString.h"
+#if defined(TARGET_ANDROID)
+#include "android/activity/XBMCApp.h"
+#endif
 
 #define critSec XBMC_GLOBAL_USE(CLog::CLogGlobals).critSec
 #define m_file XBMC_GLOBAL_USE(CLog::CLogGlobals).m_file
@@ -119,6 +122,11 @@ void CLog::Log(int loglevel, const char *format, ... )
 
     strPrefix.Format(prefixFormat, time.wHour, time.wMinute, time.wSecond, (uint64_t)CThread::GetCurrentThreadId(), levelNames[loglevel]);
 
+//print to adb
+#if defined(TARGET_ANDROID) && defined(_DEBUG)
+  CXBMCApp::android_printf("%s%s",strPrefix.c_str(), strData.c_str());
+#endif
+
     fputs(strPrefix.c_str(), m_file);
     fputs(strData.c_str(), m_file);
     fflush(m_file);
@@ -205,7 +213,18 @@ int CLog::GetLogLevel()
 void CLog::OutputDebugString(const std::string& line)
 {
 #if defined(_DEBUG) || defined(PROFILE)
-  ::OutputDebugString(line.c_str());
+#if defined(TARGET_WINDOWS)
+  // we can't use charsetconverter here as it's initialized later than CLog and deinitialized early
+  int bufSize = MultiByteToWideChar(CP_UTF8, 0, line.c_str(), -1, NULL, 0);
+  CStdStringW wstr (L"", bufSize);
+  if ( MultiByteToWideChar(CP_UTF8, 0, line.c_str(), -1, wstr.GetBuf(bufSize), bufSize) == bufSize )
+  {
+    wstr.RelBuf();
+    ::OutputDebugStringW(wstr.c_str());
+  }
+  else
+#endif // TARGET_WINDOWS
+    ::OutputDebugString(line.c_str());
   ::OutputDebugString("\n");
 #endif
 }

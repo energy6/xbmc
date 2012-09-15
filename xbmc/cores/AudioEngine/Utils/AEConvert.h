@@ -23,8 +23,6 @@
 #include <stdint.h>
 #include "../AEAudioFormat.h"
 
-/* note: always converts to machine byte endian */
-
 class CAEConvert{
 private:
   static unsigned int U8_Float    (uint8_t *data, const unsigned int samples, float   *dest);
@@ -48,6 +46,12 @@ private:
   static unsigned int Float_S32LE (float   *data, const unsigned int samples, uint8_t *dest);
   static unsigned int Float_S32BE (float   *data, const unsigned int samples, uint8_t *dest);
   static unsigned int Float_DOUBLE(float   *data, const unsigned int samples, uint8_t *dest);
+
+  static unsigned int S32LE_Float_Neon (uint8_t *data, const unsigned int samples, float   *dest);
+  static unsigned int S32BE_Float_Neon (uint8_t *data, const unsigned int samples, float   *dest);
+  static unsigned int Float_S32LE_Neon (float   *data, const unsigned int samples, uint8_t *dest);
+  static unsigned int Float_S32BE_Neon (float   *data, const unsigned int samples, uint8_t *dest);
+
 public:
   typedef unsigned int (*AEConvertToFn)(uint8_t *data, const unsigned int samples, float   *dest);
   typedef unsigned int (*AEConvertFrFn)(float   *data, const unsigned int samples, uint8_t *dest);

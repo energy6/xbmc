@@ -25,9 +25,11 @@
 #include <stdio.h>
 #include <time.h>
 #include "Archive.h"
-#include "Temperature.h"
 #include <string>
 #include <map>
+#include "threads/SystemClock.h"
+
+class CTemperature;
 
 #define CPU_FEATURE_MMX      1 << 0
 #define CPU_FEATURE_MMX2     1 << 1
@@ -40,6 +42,7 @@
 #define CPU_FEATURE_3DNOW    1 << 8
 #define CPU_FEATURE_3DNOWEXT 1 << 9
 #define CPU_FEATURE_ALTIVEC  1 << 10
+#define CPU_FEATURE_NEON     1 << 11
 
 struct CoreInfo
 {
@@ -65,7 +68,7 @@ public:
   int getUsedPercentage();
   int getCPUCount() { return m_cpuCount; }
   float getCPUFrequency();
-  CTemperature getTemperature();
+  bool getTemperature(CTemperature& temperature);
   std::string& getCPUModel() { return m_cpuModel; }
 
   const CoreInfo &GetCoreInfo(int nCoreId);
@@ -79,6 +82,7 @@ private:
   bool readProcStat(unsigned long long& user, unsigned long long& nice, unsigned long long& system,
     unsigned long long& idle, unsigned long long& io);
   void ReadCPUFeatures();
+  bool HasNeon();
 
   FILE* m_fProcStat;
   FILE* m_fProcTemperature;
@@ -91,7 +95,7 @@ private:
   unsigned long long m_ioTicks;
 
   int          m_lastUsedPercentage;
-  time_t       m_lastReadTime;
+  XbmcThreads::EndTime m_nextUsedReadTime; 
   std::string  m_cpuModel;
   int          m_cpuCount;
   unsigned int m_cpuFeatures;

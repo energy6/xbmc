@@ -29,7 +29,6 @@ DIRECTORY_ARCHIVES=$(DVDPLAYER_ARCHIVES) \
                    lib/xbmc-dll-symbols/dll-symbols.a \
                    xbmc/addons/addons.a \
                    xbmc/cdrip/cdrip.a \
-                   xbmc/commons/commons.a \
                    xbmc/cores/AudioEngine/audioengine.a \
                    xbmc/cores/DllLoader/dllloader.a \
                    xbmc/cores/DllLoader/exports/exports.a \
@@ -82,7 +81,6 @@ DIRECTORY_ARCHIVES=$(DVDPLAYER_ARCHIVES) \
                    xbmc/rendering/rendering.a \
                    xbmc/settings/settings.a \
                    xbmc/storage/storage.a \
-                   xbmc/threads/threads.a \
                    xbmc/utils/utils.a \
                    xbmc/video/dialogs/videodialogs.a \
                    xbmc/video/video.a \
@@ -90,6 +88,10 @@ DIRECTORY_ARCHIVES=$(DVDPLAYER_ARCHIVES) \
                    xbmc/windowing/windowing.a \
                    xbmc/windows/windows.a \
                    xbmc/xbmc.a \
+
+
+NWAOBJSXBMC=	xbmc/commons/commons.a \
+		xbmc/threads/threads.a \
 
 
 ifeq (@USE_WEB_SERVER@,1)
@@ -103,6 +105,7 @@ endif
 ifeq (@USE_OPENGLES@,1)
 DIRECTORY_ARCHIVES += xbmc/rendering/gles/rendering_gles.a
 DIRECTORY_ARCHIVES += xbmc/windowing/egl/windowing_egl.a
+DIRECTORY_ARCHIVES += xbmc/visualizations/EGLHelpers/eglhelpers.a
 endif
 
 ifeq ($(findstring osx,@ARCH@),osx)
@@ -113,11 +116,19 @@ DIRECTORY_ARCHIVES += xbmc/powermanagement/osx/powermanagement.a
 DIRECTORY_ARCHIVES += xbmc/storage/osx/storage.a
 DIRECTORY_ARCHIVES += xbmc/windowing/osx/windowing_osx.a
 else
+ifeq (@USE_ANDROID@,1)
+DIRECTORY_ARCHIVES += xbmc/input/linux/input_linux.a
+DIRECTORY_ARCHIVES += xbmc/network/linux/network_linux.a
+DIRECTORY_ARCHIVES += xbmc/powermanagement/android/powermanagement_android.a
+DIRECTORY_ARCHIVES += xbmc/storage/android/storage_android.a
+DIRECTORY_ARCHIVES += xbmc/windowing/X11/windowing_X11.a
+else
 DIRECTORY_ARCHIVES += xbmc/input/linux/input_linux.a
 DIRECTORY_ARCHIVES += xbmc/network/linux/network_linux.a
 DIRECTORY_ARCHIVES += xbmc/powermanagement/linux/powermanagement_linux.a
 DIRECTORY_ARCHIVES += xbmc/storage/linux/storage_linux.a
 DIRECTORY_ARCHIVES += xbmc/windowing/X11/windowing_X11.a
+endif
 endif
 
 ifeq ($(findstring freebsd,@ARCH@),freebsd)
@@ -128,7 +139,17 @@ ifeq (@HAVE_XBMC_NONFREE@,1)
 DIRECTORY_ARCHIVES += lib/UnrarXLib/UnrarXLib.a
 endif
 
-BIN_DIRS = $(dir $(DIRECTORY_ARCHIVES))
+BIN_DIRS = $(dir $(DIRECTORY_ARCHIVES)) $(dir $(NWAOBJSXBMC))
+
+ifeq (@USE_ANDROID@,1)
+DIRECTORY_ARCHIVES += xbmc/android/loader/AndroidDyload.a
+DIRECTORY_ARCHIVES += xbmc/windowing/android/windowing_android.a
+DIRECTORY_ARCHIVES += xbmc/android/activity/activity.a
+endif
+
+ifeq (@USE_AMLPLAYER@,1)
+DIRECTORY_ARCHIVES += xbmc/cores/amlplayer/amlplayer.a
+endif
 
 PAPCODECS_DIRS= \
 	lib/xbadpcm \
@@ -147,12 +168,16 @@ endif
 LIB_DIRS=\
 	lib/cximage-6.0 \
 	lib/libexif \
-	lib/cmyth \
 	lib/libhdhomerun \
 	lib/libid3tag \
 	lib/libapetag \
 	lib/cpluff \
 	lib/xbmc-dll-symbols
+
+ifeq (@USE_MYSQL@,1)
+LIB_DIRS += lib/cmyth
+CMYTH=cmyth
+endif
 
 SS_DIRS=
 ifneq (@DISABLE_RSXS@,1)
@@ -174,12 +199,6 @@ ifneq (@DISABLE_GOOM@,1)
   VIS_DIRS+=xbmc/visualizations/Goom
 endif
 
-PVR_DIRS=\
-	xbmc/pvrclients/MediaPortal \
-	xbmc/pvrclients/vdr-vnsi \
-	xbmc/pvrclients/tvheadend \
-	xbmc/pvrclients/pvr-demo
-
 LIBADDON_DIRS=\
 	lib/addons/library.xbmc.addon \
 	lib/addons/library.xbmc.pvr \
@@ -194,7 +213,7 @@ SKIN_DIRS+=$(TOUCHED_MEDIA)
 endif
 
 DIRS= $(BIN_DIRS) $(EC_DIRS) $(XBMCTEX_DIRS) $(DVDPCODECS_DIRS) $(PAPCODECS_DIRS) \
-	$(LIB_DIRS) $(SS_DIRS) $(VIS_DIRS) $(PVR_DIRS) $(LIBADDON_DIRS) $(SKIN_DIRS)
+	$(LIB_DIRS) $(SS_DIRS) $(VIS_DIRS) $(LIBADDON_DIRS) $(SKIN_DIRS)
 
 LIBS=@LIBS@
 CFLAGS=@CFLAGS@
@@ -202,20 +221,33 @@ CXXFLAGS=@CXXFLAGS@
 LDFLAGS=@LDFLAGS@
 INCLUDES=$(sort @INCLUDES@)
 
-CLEAN_FILES=xbmc.bin xbmc-xrandr
+CLEAN_FILES=xbmc.bin xbmc-xrandr libxbmc.so
 
 DISTCLEAN_FILES=config.h config.log config.status tools/Linux/xbmc.sh \
         tools/Linux/xbmc-standalone.sh autom4te.cache config.h.in~ \
         system/libcpluff-@ARCH@.so
 
-all : Makefile externals xbmc.bin xbmc-xrandr skins
+ifeq (@USE_LIBXBMC@,1)
+FINAL_TARGETS+=libxbmc.so
+ifeq (@USE_ANDROID@,1)
+FINAL_TARGETS+=skins
+endif
+else
+FINAL_TARGETS=xbmc.bin skins xbmc-xrandr
+endif
+FINAL_TARGETS+=Makefile externals
+
+CHECK_DIRS = xbmc/utils/test \
+             xbmc/threads/test
+
+all : $(FINAL_TARGETS)
 	@echo '-----------------------'
 	@echo 'XBMC built successfully'
 	@echo '-----------------------'
 
 include Makefile.include
 
-.PHONY : dllloader exports pvrclients visualizations screensavers eventclients \
+.PHONY : dllloader exports visualizations screensavers eventclients \
 	papcodecs dvdpcodecs imagelib codecs externals force libaddon skins
 
 # hack targets to keep build system up to date
@@ -248,6 +280,9 @@ endif
 xbmc/cores/paplayer/paplayer.a: papcodecs
 $(DVDPLAYER_ARCHIVES)         : dvdpcodecs
 
+$(NWAOBJSXBMC): force
+	@$(MAKE) $(if $(V),,-s) -C $(@D)
+
 $(DIRECTORY_ARCHIVES): force
 	@$(MAKE) $(if $(V),,-s) -C $(@D)
 
@@ -255,7 +290,7 @@ lib/libapetag/.libs/libapetag.a: force
 	$(MAKE) -C lib/libapetag
 lib/cpluff/libcpluff/.libs/libcpluff.a: force
 	$(MAKE) -C lib/cpluff/libcpluff
-system/libcpluff-@ARCH@.so: lib/cpluff/libcpluff/.libs/libcpluff.a
+system/libcpluff-@ARCH@.so: lib/cpluff/libcpluff/.libs/libcpluff.a exports
 ifeq ($(findstring osx,@ARCH@), osx)
   ifeq (@ARCH@, arm-osx)
 	$(CXX) $(LDFLAGS) -all_load -bundle -flat_namespace -undefined dynamic_lookup -read_only_relocs suppress -o $@ $<
@@ -263,25 +298,29 @@ ifeq ($(findstring osx,@ARCH@), osx)
 	$(CXX) $(LDFLAGS) -all_load -bundle -flat_namespace -undefined dynamic_lookup -lexpat $(BUNDLE1_O) -o $@ $<
   endif
 else
-	cp lib/cpluff/libcpluff/.libs/libcpluff.so $@
+	$(CXX) $(LDFLAGS) -shared -o $@ -Wl,--whole-archive $< \
+		-Wl,--no-whole-archive  \
+		`cat xbmc/cores/DllLoader/exports/wrapper.def` xbmc/cores/DllLoader/exports/wrapper.o -lexpat
 endif
 
 exports: xbmc/cores/DllLoader/exports/exports.a xbmc/cores/DllLoader/exports/util/exports_utils.a
 	$(MAKE) -C xbmc/cores/DllLoader/exports wrapper.def
 dllloader: exports xbmc/cores/DllLoader/dllloader.a
 
-$(VIS_DIRS) $(SS_DIRS): force exports
+ifeq (@USE_OPENGLES@,1)
+EGLHELPERS=xbmc/visualizations/EGLHelpers/eglhelpers.a
+endif
+
+$(VIS_DIRS): force exports $(EGLHELPERS)
+	$(MAKE) -C $@
+
+$(SS_DIRS): force exports
 	$(MAKE) -C $@
 
 visualizations: $(VIS_DIRS)
 
 screensavers: $(SS_DIRS)
 
-pvrclients: exports
-	$(MAKE) -C xbmc/pvrclients/MediaPortal
-	$(MAKE) -C xbmc/pvrclients/vdr-vnsi
-	$(MAKE) -C xbmc/pvrclients/tvheadend
-	$(MAKE) -C xbmc/pvrclients/pvr-demo
 libaddon: exports
 	$(MAKE) -C lib/addons/library.xbmc.addon
 	$(MAKE) -C lib/addons/library.xbmc.gui
@@ -290,7 +329,7 @@ libpython: dllloader
 	$(MAKE) -C xbmc/interfaces/python
 	$(MAKE) -C xbmc/interfaces/python/xbmcmodule
 dvdpcodecs: dllloader
-	$(MAKE) -C lib 
+	$(MAKE) -C lib
 	$(MAKE) -C lib/libdvd
 eventclients:
 ifeq ($(findstring osx,@ARCH@), osx)
@@ -313,28 +352,35 @@ papcodecs: dllloader dvdpcodecs
 	$(MAKE) -C lib/xbadpcm
 	$(MAKE) -C lib/vgmstream
 	$(MAKE) -C lib/timidity
-	$(MAKE) -C lib/nosefart 
+	$(MAKE) -C lib/nosefart
 ifneq ($(findstring arm-osx,@ARCH@), arm-osx)
-	$(MAKE) -C lib/libsidplay2 
+	$(MAKE) -C lib/libsidplay2
 endif
 ifeq (@USE_ASAP_CODEC@,1)
   ifneq ($(findstring osx,@ARCH@), osx)
 	$(MAKE) -C lib/asap asap-xbmc
   endif
 endif
-	$(MAKE) -C lib/stsound/StSoundLibrary	
+	$(MAKE) -C lib/stsound/StSoundLibrary
 ifeq ($(or $(findstring powerpc,@ARCH@),$(findstring x86_64-linux,@ARCH@),$(findstring arm, @ARCH@),$(findstring freebsd,@ARCH@)),)
 	$(MAKE) -C lib/snesapu/SNES/SNESAPU
 endif
 imagelib: dllloader
 	$(MAKE) -C lib/cximage-6.0
 
+pvraddons: exports
+ifeq (@USE_PVR_ADDONS@,1)
+	$(MAKE) -C pvr-addons
+endif
+
 codecs: papcodecs dvdpcodecs
-libs: cmyth libhdhomerun libid3tag imagelib libexif system/libcpluff-@ARCH@.so
-externals: libaddon codecs libs pvrclients visualizations screensavers
+
+libs: libhdhomerun libid3tag imagelib libexif system/libcpluff-@ARCH@.so $(CMYTH)
+
+externals: libaddon codecs libs visualizations screensavers pvraddons
 
 xcode_depends: \
-	codecs libs pvrclients visualizations screensavers eventclients libaddon skins \
+	codecs libs visualizations screensavers eventclients libaddon skins pvraddons \
 	lib/libsquish/libsquish.a \
 	lib/libapetag/.libs/libapetag.a \
 	lib/libRTV/librtv.a \
@@ -363,14 +409,19 @@ endif
 
 OBJSXBMC:=$(filter-out $(DYNOBJSXBMC), $(OBJSXBMC))
 
-LIBS += @PYTHON_LDFLAGS@
+libxbmc.so: $(OBJSXBMC) $(DYNOBJSXBMC) $(NWAOBJSXBMC)
+ifeq ($(findstring osx,@ARCH@), osx)
+	$(SILENT_LD) $(CXX) $(LDFLAGS) -bundle -o $@ -Wl,-all_load,-ObjC $(DYNOBJSXBMC) $(NWAOBJSXBMC) $(OBJSXBMC) $(LIBS)
+else
+	$(SILENT_LD) $(CXX) $(CXXFLAGS) $(LDFLAGS) -shared -o $@ -Wl,--whole-archive $(DYNOBJSXBMC) $(OBJSXBMC) -Wl,--no-whole-archive -Wl,--no-undefined $(NWAOBJSXBMC) $(LIBS)
+endif
 
 xbmc.bin: $(OBJSXBMC) $(DYNOBJSXBMC) $(NWAOBJSXBMC)
 
 ifeq ($(findstring osx,@ARCH@), osx)
-	$(SILENT_LD) $(CXX) $(LDFLAGS) -o xbmc.bin -Wl,-all_load,-ObjC $(DYNOBJSXBMC) $(OBJSXBMC) $(LIBS) -rdynamic
+	$(SILENT_LD) $(CXX) $(LDFLAGS) -o xbmc.bin -Wl,-all_load,-ObjC $(DYNOBJSXBMC) $(NWAOBJSXBMC) $(OBJSXBMC) $(LIBS) -rdynamic
 else
-	$(SILENT_LD) $(CXX) $(CXXFLAGS) $(LDFLAGS) -o xbmc.bin -Wl,--whole-archive $(DYNOBJSXBMC) $(OBJSXBMC) -Wl,--no-whole-archive $(LIBS) -rdynamic
+	$(SILENT_LD) $(CXX) $(CXXFLAGS) $(LDFLAGS) -o xbmc.bin -Wl,--whole-archive $(DYNOBJSXBMC) $(OBJSXBMC) -Wl,--no-whole-archive $(NWAOBJSXBMC) $(LIBS) -rdynamic
 endif
 
 xbmc-xrandr: xbmc-xrandr.c
@@ -378,7 +429,7 @@ ifneq (1,@USE_XRANDR@)
 	# xbmc-xrandr.c gets picked up by the default make rules
 	@echo "excluding xbmc-xrandr"
 else
-	$(SILENT_LD) $(CC) $(CFLAGS) $(LDFLAGS) -o xbmc-xrandr xbmc-xrandr.c -lXrandr -lX11
+	$(SILENT_LD) $(CC) $(CFLAGS) $(LDFLAGS) -o xbmc-xrandr xbmc-xrandr.c -lXrandr -lX11 -lm
 endif
 
 tools/XBMCTex/XBMCTex:
@@ -402,18 +453,28 @@ ifeq ($(findstring osx,@ARCH@), osx)
 else
 install: install-binaries install-arch install-datas
 
+apk: install
+	make -C tools/android/packaging
+
 install-binaries: install-scripts
-	@echo "Copying XBMC binary to $(DESTDIR)$(libdir)/xbmc/xbmc.bin"
+	@echo "Copying XBMC binary to $(DESTDIR)$(libdir)/xbmc/"
 	@install -d $(DESTDIR)$(libdir)/xbmc
-	@install xbmc.bin $(DESTDIR)$(libdir)/xbmc/xbmc.bin
 ifeq (1,@USE_XRANDR@)
 	@install xbmc-xrandr $(DESTDIR)$(libdir)/xbmc/xbmc-xrandr
 endif
+ifeq (@USE_LIBXBMC@,1)
+	@install libxbmc.so $(DESTDIR)$(libdir)/xbmc/libxbmc.so
+else
+	@install xbmc.bin $(DESTDIR)$(libdir)/xbmc/xbmc.bin
 	@echo "You can run XBMC with the command 'xbmc'"
+endif
 endif
 
 install-arch:
 	@# Arch dependent files
+ifeq (@USE_PVR_ADDONS@,1)
+	$(MAKE) -C pvr-addons install
+endif
 ifeq ($(findstring freebsd,@ARCH@), freebsd)
 	@find -E system addons -type f -not -iregex ".*svn.*" \
 		-iregex ".*@ARCH@.*|.*\.pvr|.*\.vis|.*\.xbs" \
@@ -422,7 +483,16 @@ ifeq ($(findstring freebsd,@ARCH@), freebsd)
 		-exec install "{}" $(DESTDIR)$(libdir)/xbmc/"{}" \; \
 		-exec printf " -- %-75.75s\r" "{}" \;
 else
-	@find system addons -regextype posix-extended -type f -not -iregex ".*svn.*" -iregex ".*@ARCH@.*|.*\.pvr|.*\.vis|.*\.xbs" -exec install -D "{}" $(DESTDIR)$(libdir)/xbmc/"{}" \; -printf " -- %-75.75f\r"
+ifeq ($(findstring Darwin,$(shell uname -s)),Darwin)
+	@find -E system addons -type f -not -iregex ".*svn.*" \
+		-iregex ".*@ARCH@.*|.*\.vis|.*\.xbs|.*\.pvr" \
+		-exec sh -c "install -d \"$(DESTDIR)$(libdir)/xbmc/\`dirname '{}'\`\"" \; \
+		-and \
+		-exec install "{}" $(DESTDIR)$(libdir)/xbmc/"{}" \; \
+		-exec printf " -- %-75.75s\r" "{}" \;
+else
+	@find system addons -regextype posix-extended -type f -not -iregex ".*svn.*" -iregex ".*\.so|.*\.vis|.*\.xbs|.*\.pvr" -exec install -D "{}" $(DESTDIR)$(libdir)/xbmc/"{}" \; -printf " -- %-75.75f\r"
+endif
 endif
 
 install-scripts:
@@ -453,7 +523,16 @@ ifeq ($(findstring bsd,@ARCH@), bsd)
 		-exec install -m 0644 "{}" $(DESTDIR)$(datarootdir)/xbmc/"{}" \; \
 		-exec printf " -- %-75.75s\r" "{}" \;
 else
-	@find addons language media sounds userdata system -regextype posix-extended -type f -not -iregex ".*@ARCH@.*|.*\.pvr|.*\.vis|.*\.xbs|.*svn.*|.*\.so|.*\.dll" -exec install -D -m 0644 "{}" $(DESTDIR)$(datarootdir)/xbmc/"{}" \; -printf " -- %-75.75f\r"
+ifeq ($(findstring Darwin,$(shell uname -s)),Darwin)
+	@find -E addons language media sounds userdata system -type f \
+		-not -iregex ".*@ARCH@.*|.*\.vis|.*\.xbs|.*svn.*|.*\.so|.*\.dll|.*\.pvr" \
+		-exec sh -c "install -d \"$(DESTDIR)$(datarootdir)/xbmc/\`dirname '{}'\`\"" \; \
+		-and \
+		-exec install -m 0644 "{}" $(DESTDIR)$(datarootdir)/xbmc/"{}" \; \
+		-exec printf " -- %-75.75s\r" "{}" \;
+else
+	@find addons language media sounds userdata system -regextype posix-extended -type f -not -iregex ".*@ARCH@.*|.*\.vis|.*\.xbs|.*svn.*|.*\.so|.*\.dll|.*\.pvr" -exec install -D -m 0644 "{}" $(DESTDIR)$(datarootdir)/xbmc/"{}" \; -printf " -- %-75.75f\r"
+endif
 endif
 	@# Icons and links
 	@install -d $(DESTDIR)$(datarootdir)/applications
@@ -481,22 +560,27 @@ clean-eventclients:
 	for d in $(EC_DIRS); do if test -f $$d/Makefile; then $(MAKE) -C $$d clean; fi; done
 clean-xbmctex:
 	for d in $(XBMCTEX_DIRS); do if test -f $$d/Makefile; then $(MAKE) -C $$d clean; fi; done
-clean-dvdpcodecs: 
+clean-dvdpcodecs:
 	for d in $(DVDPCODECS_DIRS); do if test -f $$d/Makefile; then $(MAKE) -C $$d clean; fi; done
 clean-papcodecs:
 	for d in $(PAPCODECS_DIRS); do if test -f $$d/Makefile; then $(MAKE) -C $$d clean; fi; done
-clean-libs: 
+clean-libs:
 	for d in $(LIB_DIRS); do if test -f $$d/Makefile; then $(MAKE) -C $$d clean; fi; done
-clean-screensavers: 
+clean-screensavers:
 	for d in $(SS_DIRS); do if test -f $$d/Makefile; then $(MAKE) -C $$d clean; fi; done
 clean-visualisations:
 	for d in $(VIS_DIRS); do if test -f $$d/Makefile; then $(MAKE) -C $$d clean; fi; done
-clean-pvrclients:
-	for d in $(PVR_DIRS); do if test -f $$d/Makefile; then $(MAKE) -C $$d clean; fi; done
 clean-libaddons:
 	for d in $(LIBADDON_DIRS); do if test -f $$d/Makefile; then $(MAKE) -C $$d clean; fi; done
+clean-pvraddons:
+ifeq (@USE_PVR_ADDONS@,1)
+	if test -f pvr-addons/Makefile; then $(MAKE) -C pvr-addons clean; fi;
+endif
 
 clean-codecs: clean-dvdpcodecs clean-papcodecs
 
 clean-externals: clean-codecs clean-eventclients clean-xbmctex clean-libs \
-	clean-pvrclients clean-screensavers clean-visualisations clean-libaddons
+	clean-screensavers clean-visualisations clean-libaddons clean-pvraddons
+
+check:
+	for d in $(CHECK_DIRS); do if test -f $$d/Makefile; then $(MAKE) -C $$d $@; fi; done

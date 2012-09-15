@@ -23,10 +23,8 @@
 #include "guilib/GUIRadioButtonControl.h"
 #include "guilib/GUISpinControlEx.h"
 #include "guilib/GUIEditControl.h"
-#include "dialogs/GUIDialogNumeric.h"
 #include "Util.h"
 #include "dialogs/GUIDialogOK.h"
-#include "dialogs/GUIDialogKeyboard.h"
 #include "GUISettings.h"
 #include "guilib/GUIImage.h"
 #include "guilib/LocalizeStrings.h"
@@ -196,6 +194,8 @@ CEditSettingControl::CEditSettingControl(CGUIEditControl *pEdit, int id, CSettin
     m_pEdit->SetInputType(CGUIEditControl::INPUT_TYPE_IPADDRESS, heading);
   else if (pSetting->GetControlType() == EDIT_CONTROL_NUMBER_INPUT)
     m_pEdit->SetInputType(CGUIEditControl::INPUT_TYPE_NUMBER, heading);
+  else if (pSetting->GetControlType() == EDIT_CONTROL_HIDDEN_NUMBER_VERIFY_NEW)
+    m_pEdit->SetInputType(CGUIEditControl::INPUT_TYPE_PASSWORD_NUMBER_VERIFY_NEW, heading);
   else
     m_pEdit->SetInputType(CGUIEditControl::INPUT_TYPE_TEXT, heading);
   Update();

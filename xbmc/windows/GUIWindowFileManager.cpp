@@ -25,7 +25,6 @@
 #include "Util.h"
 #include "filesystem/Directory.h"
 #include "filesystem/ZipManager.h"
-#include "pictures/Picture.h"
 #include "dialogs/GUIDialogContextMenu.h"
 #include "guilib/GUIListContainer.h"
 #include "dialogs/GUIDialogMediaSource.h"
@@ -40,7 +39,7 @@
 #include "guilib/GUIWindowManager.h"
 #include "dialogs/GUIDialogOK.h"
 #include "dialogs/GUIDialogYesNo.h"
-#include "dialogs/GUIDialogKeyboard.h"
+#include "guilib/GUIKeyboardFactory.h"
 #include "dialogs/GUIDialogProgress.h"
 #include "Favourites.h"
 #include "playlists/PlayList.h"
@@ -59,6 +58,7 @@
 #include "utils/FileUtils.h"
 #include "utils/URIUtils.h"
 #include "Autorun.h"
+#include "URL.h"
 
 using namespace std;
 using namespace XFILE;
@@ -345,7 +345,7 @@ void CGUIWindowFileManager::OnSort(int iList)
 
   }
 
-  m_vecItems[iList]->Sort(SORT_METHOD_LABEL, SORT_ORDER_ASC);
+  m_vecItems[iList]->Sort(SORT_METHOD_LABEL, SortOrderAscending);
 }
 
 void CGUIWindowFileManager::ClearFileItems(int iList)
@@ -486,7 +486,7 @@ bool CGUIWindowFileManager::Update(int iList, const CStdString &strDirectory)
     pItem->SetLabel(strLabel);
     pItem->SetLabelPreformated(true);
     pItem->m_bIsFolder = true;
-    pItem->SetSpecialSort(SORT_ON_BOTTOM);
+    pItem->SetSpecialSort(SortSpecialOnBottom);
     m_vecItems[iList]->Add(pItem);
   }
   else if (items.IsEmpty() || g_guiSettings.GetBool("filelists.showparentdiritems"))
@@ -631,8 +631,6 @@ void CGUIWindowFileManager::OnStart(CFileItem *pItem)
     return ;
   }
 #endif
-  if (pItem->IsShortCut())
-    CUtil::RunShortcut(pItem->GetPath());
   if (pItem->IsPicture())
   {
     CGUIWindowSlideShow *pSlideShow = (CGUIWindowSlideShow *)g_windowManager.GetWindow(WINDOW_SLIDESHOW);
@@ -772,7 +770,7 @@ void CGUIWindowFileManager::OnSelectAll(int iList)
 void CGUIWindowFileManager::OnNewFolder(int iList)
 {
   CStdString strNewFolder = "";
-  if (CGUIDialogKeyboard::ShowAndGetInput(strNewFolder, g_localizeStrings.Get(16014), false))
+  if (CGUIKeyboardFactory::ShowAndGetInput(strNewFolder, g_localizeStrings.Get(16014), false))
   {
     CStdString strNewPath = m_Directory[iList]->GetPath();
     URIUtils::AddSlashAtEnd(strNewPath);

@@ -24,6 +24,7 @@
 #include "FileItem.h"
 #include "utils/log.h"
 #include "utils/URIUtils.h"
+#include "cores/AudioEngine/Utils/AEUtil.h"
 
 using namespace MUSIC_INFO;
 
@@ -38,8 +39,8 @@ OGGCodec::OGGCodec() : m_callback(m_file)
   m_TimeOffset = 0.0;
   m_CurrentStream=0;
   m_TotalTime = 0;
-  m_VorbisFile.datasource = NULL;
   m_inited = false;
+  memset(&m_VorbisFile, 0, sizeof(m_VorbisFile));
 }
 
 OGGCodec::~OGGCodec()

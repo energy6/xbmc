@@ -26,7 +26,9 @@
 //
 #include <sys/types.h>
 #include <sys/stat.h>
+#if !defined(__ANDROID__)
 #include <sys/statvfs.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -36,15 +38,15 @@
 #else
 #include <dirent.h>
 #endif
+#include <dlfcn.h>
 
-#if defined(TARGET_DARWIN) || defined(__FreeBSD__)
-typedef int64_t   off64_t;
+#if defined(TARGET_DARWIN) || defined(__FreeBSD__) || defined(__ANDROID__)
 typedef off_t     __off_t;
+typedef int64_t   off64_t;
 typedef off64_t   __off64_t;
 typedef fpos_t    fpos64_t;
 #define stat64    stat
-#define statvfs64 statvfs
-#if defined(TARGET_DARWIN)
+#if defined(TARGET_DARWIN) || defined(TARGET_ANDROID)
 #define _G_va_list va_list
 #endif
 #endif
@@ -109,10 +111,19 @@ int dll_ftrylockfile(FILE *file);
 void dll_funlockfile(FILE *file);
 int dll_fstat64(int fd, struct stat64 *buf);
 int dll_fstat(int fd, struct _stat *buf);
-int dll_fstatvfs64(int fd, struct statvfs64 *buf);
 FILE* dll_popen(const char *command, const char *mode);
+void* dll_dlopen(const char *filename, int flag);
 int dll_setvbuf(FILE *stream, char *buf, int type, size_t size);
 struct mntent *dll_getmntent(FILE *fp);
+
+void *__wrap_dlopen(const char *filename, int flag)
+{
+#if defined(TARGET_ANDROID)
+  return dll_dlopen(filename, flag);
+#else
+  return dlopen(filename, flag);
+#endif
+}
 
 FILE *__wrap_popen(const char *command, const char *mode)
 {
@@ -423,11 +434,6 @@ void __wrap_funlockfile(FILE *file)
 int __wrap___fxstat64(int ver, int fd, struct stat64 *buf)
 {
   return dll_fstat64(fd, buf);
-}
-
-int __wrap_fstatvfs64(int fd, struct statvfs64 *buf)
-{
-  return dll_fstatvfs64(fd, buf);
 }
 
 int __wrap_fstat(int fd, struct _stat *buf)

@@ -29,8 +29,20 @@ class CBookmark
 public:
   CBookmark();
   void Reset();
+
+  /*! \brief returns true if this bookmark has been set.
+   \return true if totalTimeInSeconds is positive.
+   */
+  bool IsSet() const;
+
+  /*! \brief returns true if this bookmark is part way through the video file
+   \return true if both totalTimeInSeconds and timeInSeconds are positive.
+   */
+  bool IsPartWay() const;
+
   double timeInSeconds;
   double totalTimeInSeconds;
+  long partNumber;
   CStdString thumbNailImage;
   CStdString playerState;
   CStdString player;

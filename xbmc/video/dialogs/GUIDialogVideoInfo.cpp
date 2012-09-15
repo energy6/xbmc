@@ -22,14 +22,13 @@
 #include "GUIDialogVideoInfo.h"
 #include "guilib/GUIWindow.h"
 #include "Util.h"
-#include "pictures/Picture.h"
 #include "guilib/GUIImage.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
 #include "video/windows/GUIWindowVideoNav.h"
 #include "dialogs/GUIDialogFileBrowser.h"
 #include "video/VideoInfoScanner.h"
-#include "Application.h"
+#include "ApplicationMessenger.h"
 #include "video/VideoInfoTag.h"
 #include "guilib/GUIWindowManager.h"
 #include "dialogs/GUIDialogOK.h"
@@ -46,6 +45,8 @@
 #include "guilib/LocalizeStrings.h"
 #include "GUIUserMessages.h"
 #include "TextureCache.h"
+#include "music/MusicDatabase.h"
+#include "URL.h"
 
 using namespace std;
 using namespace XFILE;
@@ -233,12 +234,16 @@ void CGUIDialogVideoInfo::SetMovie(const CFileItem *item)
   VIDEODB_CONTENT_TYPE type = (VIDEODB_CONTENT_TYPE)m_movieItem->GetVideoContentType();
   if (type == VIDEODB_CONTENT_MUSICVIDEOS)
   { // music video
+    CMusicDatabase database;
+    database.Open();
     const std::vector<std::string> &artists = m_movieItem->GetVideoInfoTag()->m_artist;
     for (std::vector<std::string>::const_iterator it = artists.begin(); it != artists.end(); ++it)
     {
+      int idArtist = database.GetArtistByName(*it);
+      CStdString thumb = database.GetArtForItem(idArtist, "artist", "thumb");
       CFileItemPtr item(new CFileItem(*it));
-      if (CFile::Exists(item->GetCachedArtistThumb()))
-        item->SetThumbnailImage(item->GetCachedArtistThumb());
+      if (!thumb.empty())
+        item->SetThumbnailImage(thumb);
       item->SetIconImage("DefaultArtist.png");
       m_castList->Add(item);
     }
@@ -292,18 +297,20 @@ void CGUIDialogVideoInfo::SetMovie(const CFileItem *item)
         m_movieItem->GetVideoInfoTag()->m_iYear = m_movieItem->m_dateTime.GetYear();
       // retrieve the season thumb.
       // TODO: should we use the thumbloader for this?
-      if (m_movieItem->GetVideoInfoTag()->m_iSeason > -1)
+      CVideoDatabase db;
+      if (db.Open())
       {
-        CVideoDatabase db;
-        if (db.Open())
+        if (m_movieItem->GetVideoInfoTag()->m_iSeason > -1)
         {
-          int seasonID = db.GetSeasonId(m_movieItem->GetVideoInfoTag()->m_iIdShow,
-                                        m_movieItem->GetVideoInfoTag()->m_iSeason);
+          int seasonID = m_movieItem->GetVideoInfoTag()->m_iIdSeason;
+          if (seasonID < 0)
+            seasonID = db.GetSeasonId(m_movieItem->GetVideoInfoTag()->m_iIdShow,
+                                      m_movieItem->GetVideoInfoTag()->m_iSeason);
           string thumb = db.GetArtForItem(seasonID, "season", "thumb");
           if (!thumb.empty())
             m_movieItem->SetProperty("seasonthumb", thumb);
-          db.Close();
         }
+        db.Close();
       }
     }
     else if (type == VIDEODB_CONTENT_MOVIES)
@@ -375,7 +382,7 @@ void CGUIDialogVideoInfo::Update()
   }
 
   // Check for resumability
-  if (CGUIWindowVideoBase::GetResumeItemOffset(m_movieItem.get()) > 0)
+  if (m_movieItem->GetVideoInfoTag()->m_resumePoint.timeInSeconds > 0.0)
     CONTROL_ENABLE(CONTROL_BTN_RESUME);
   else
     CONTROL_DISABLE(CONTROL_BTN_RESUME);
@@ -639,10 +646,6 @@ void CGUIDialogVideoInfo::OnGetThumb()
     return;   // user chose the one they have
 
   CStdString newThumb;
-  // delete the thumbnail if that's what the user wants, else overwrite with the
-  // new thumbnail
-  CFileItem item(*m_movieItem->GetVideoInfoTag());
-
   if (result.Left(14) == "thumb://Remote")
   {
     int number = atoi(result.Mid(14));
@@ -789,9 +792,9 @@ void CGUIDialogVideoInfo::PlayTrailer()
   Close(true);
 
   if (item.IsPlayList())
-    g_application.getApplicationMessenger().MediaPlay(item);
+    CApplicationMessenger::Get().MediaPlay(item);
   else
-    g_application.getApplicationMessenger().PlayFile(item);
+    CApplicationMessenger::Get().PlayFile(item);
 }
 
 void CGUIDialogVideoInfo::SetLabel(int iControl, const CStdString &strLabel)

@@ -65,6 +65,7 @@
 #endif
 
 #ifdef TARGET_DARWIN
+  #include "osx/CocoaInterface.h"
   #include <CoreVideo/CoreVideo.h>
   #include <OpenGL/CGLIOSurface.h>
 #endif
@@ -81,7 +82,6 @@
 using namespace Shaders;
 
 static const GLubyte stipple_weave[] = {
-  0xFF, 0xFF, 0xFF, 0xFF,
   0x00, 0x00, 0x00, 0x00,
   0xFF, 0xFF, 0xFF, 0xFF,
   0x00, 0x00, 0x00, 0x00,
@@ -114,6 +114,7 @@ static const GLubyte stipple_weave[] = {
   0xFF, 0xFF, 0xFF, 0xFF,
   0x00, 0x00, 0x00, 0x00,
   0xFF, 0xFF, 0xFF, 0xFF,
+  0x00, 0x00, 0x00, 0x00,
 };
 
 CLinuxRendererGL::YUVBUFFER::YUVBUFFER()
@@ -267,10 +268,11 @@ bool CLinuxRendererGL::ValidateRenderTarget()
   return false;
 }
 
-bool CLinuxRendererGL::Configure(unsigned int width, unsigned int height, unsigned int d_width, unsigned int d_height, float fps, unsigned flags, ERenderFormat format, unsigned extended_format)
+bool CLinuxRendererGL::Configure(unsigned int width, unsigned int height, unsigned int d_width, unsigned int d_height, float fps, unsigned flags, ERenderFormat format, unsigned extended_format, unsigned int orientation)
 {
   m_sourceWidth = width;
   m_sourceHeight = height;
+  m_renderOrientation = orientation;
   m_fps = fps;
 
   // Save the flags.
@@ -628,8 +630,6 @@ void CLinuxRendererGL::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
       index = m_iYV12RenderBuffer;
     }
   }
-  else
-    m_iLastRenderBuffer = index;
 
   if (clear)
   {
@@ -652,17 +652,26 @@ void CLinuxRendererGL::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
   }
 
-  if( (flags & RENDER_FLAG_TOP)
-   && (flags & RENDER_FLAG_BOT) )
+  if(flags & RENDER_FLAG_WEAVE)
   {
+    int top_index = index;
+    int bot_index = index;
+
+    if((flags & RENDER_FLAG_FIELD0) && m_iLastRenderBuffer > -1)
+    {
+      if(flags & RENDER_FLAG_TOP)
+        bot_index = m_iLastRenderBuffer;
+      else
+        top_index = m_iLastRenderBuffer;
+    }
+
     glEnable(GL_POLYGON_STIPPLE);
-
     glPolygonStipple(stipple_weave);
-    Render(flags & ~RENDER_FLAG_BOT, index);
+    Render((flags & ~RENDER_FLAG_FIELDMASK) | RENDER_FLAG_TOP, top_index);
     glPolygonStipple(stipple_weave+4);
-    Render(flags & ~RENDER_FLAG_TOP , index);
-
+    Render((flags & ~RENDER_FLAG_FIELDMASK) | RENDER_FLAG_BOT, bot_index);
     glDisable(GL_POLYGON_STIPPLE);
+
   }
   else
     Render(flags, index);
@@ -691,39 +700,39 @@ void CLinuxRendererGL::DrawBlackBars()
   glBegin(GL_QUADS);
 
   //top quad
-  if (m_destRect.y1 > 0.0)
+  if (m_rotatedDestCoords[0].y > 0.0)
   {
-    glVertex4f(0.0,                          0.0,           0.0, 1.0);
-    glVertex4f(g_graphicsContext.GetWidth(), 0.0,           0.0, 1.0);
-    glVertex4f(g_graphicsContext.GetWidth(), m_destRect.y1, 0.0, 1.0);
-    glVertex4f(0.0,                          m_destRect.y1, 0.0, 1.0);
+    glVertex4f(0.0,                          0.0,                      0.0, 1.0);
+    glVertex4f(g_graphicsContext.GetWidth(), 0.0,                      0.0, 1.0);
+    glVertex4f(g_graphicsContext.GetWidth(), m_rotatedDestCoords[0].y, 0.0, 1.0);
+    glVertex4f(0.0,                          m_rotatedDestCoords[0].y, 0.0, 1.0);
   }
 
   //bottom quad
-  if (m_destRect.y2 < g_graphicsContext.GetHeight())
+  if (m_rotatedDestCoords[2].y < g_graphicsContext.GetHeight())
   {
-    glVertex4f(0.0,                          m_destRect.y2,                 0.0, 1.0);
-    glVertex4f(g_graphicsContext.GetWidth(), m_destRect.y2,                 0.0, 1.0);
+    glVertex4f(0.0,                          m_rotatedDestCoords[2].y,      0.0, 1.0);
+    glVertex4f(g_graphicsContext.GetWidth(), m_rotatedDestCoords[2].y,      0.0, 1.0);
     glVertex4f(g_graphicsContext.GetWidth(), g_graphicsContext.GetHeight(), 0.0, 1.0);
     glVertex4f(0.0,                          g_graphicsContext.GetHeight(), 0.0, 1.0);
   }
 
   //left quad
-  if (m_destRect.x1 > 0.0)
+  if (m_rotatedDestCoords[0].x > 0.0)
   {
-    glVertex4f(0.0,           m_destRect.y1, 0.0, 1.0);
-    glVertex4f(m_destRect.x1, m_destRect.y1, 0.0, 1.0);
-    glVertex4f(m_destRect.x1, m_destRect.y2, 0.0, 1.0);
-    glVertex4f(0.0,           m_destRect.y2, 0.0, 1.0);
+    glVertex4f(0.0,                      m_rotatedDestCoords[0].y, 0.0, 1.0);
+    glVertex4f(m_rotatedDestCoords[0].x, m_rotatedDestCoords[0].y, 0.0, 1.0);
+    glVertex4f(m_rotatedDestCoords[0].x, m_rotatedDestCoords[2].y, 0.0, 1.0);
+    glVertex4f(0.0,                      m_rotatedDestCoords[2].y, 0.0, 1.0);
   }
 
   //right quad
-  if (m_destRect.x2 < g_graphicsContext.GetWidth())
+  if (m_rotatedDestCoords[2].x < g_graphicsContext.GetWidth())
   {
-    glVertex4f(m_destRect.x2,                 m_destRect.y1, 0.0, 1.0);
-    glVertex4f(g_graphicsContext.GetWidth(),  m_destRect.y1, 0.0, 1.0);
-    glVertex4f(g_graphicsContext.GetWidth(),  m_destRect.y2, 0.0, 1.0);
-    glVertex4f(m_destRect.x2,                 m_destRect.y2, 0.0, 1.0);
+    glVertex4f(m_rotatedDestCoords[2].x,     m_rotatedDestCoords[0].y, 0.0, 1.0);
+    glVertex4f(g_graphicsContext.GetWidth(), m_rotatedDestCoords[0].y, 0.0, 1.0);
+    glVertex4f(g_graphicsContext.GetWidth(), m_rotatedDestCoords[2].y, 0.0, 1.0);
+    glVertex4f(m_rotatedDestCoords[2].x,     m_rotatedDestCoords[2].y, 0.0, 1.0);
   }
 
   glEnd();
@@ -732,6 +741,8 @@ void CLinuxRendererGL::DrawBlackBars()
 void CLinuxRendererGL::FlipPage(int source)
 {
   UnBindPbo(m_buffers[m_iYV12RenderBuffer]);
+
+  m_iLastRenderBuffer = m_iYV12RenderBuffer;
 
   if( source >= 0 && source < m_NumYV12Buffers )
     m_iYV12RenderBuffer = source;
@@ -1249,22 +1260,22 @@ void CLinuxRendererGL::RenderSinglePass(int index, int field)
   glMultiTexCoord2fARB(GL_TEXTURE0, planes[0].rect.x1, planes[0].rect.y1);
   glMultiTexCoord2fARB(GL_TEXTURE1, planes[1].rect.x1, planes[1].rect.y1);
   glMultiTexCoord2fARB(GL_TEXTURE2, planes[2].rect.x1, planes[2].rect.y1);
-  glVertex4f(m_destRect.x1, m_destRect.y1, 0, 1.0f );
+  glVertex4f(m_rotatedDestCoords[0].x, m_rotatedDestCoords[0].y, 0, 1.0f );//top left
 
   glMultiTexCoord2fARB(GL_TEXTURE0, planes[0].rect.x2, planes[0].rect.y1);
   glMultiTexCoord2fARB(GL_TEXTURE1, planes[1].rect.x2, planes[1].rect.y1);
   glMultiTexCoord2fARB(GL_TEXTURE2, planes[2].rect.x2, planes[2].rect.y1);
-  glVertex4f(m_destRect.x2, m_destRect.y1, 0, 1.0f);
+  glVertex4f(m_rotatedDestCoords[1].x, m_rotatedDestCoords[1].y, 0, 1.0f );//top right
 
   glMultiTexCoord2fARB(GL_TEXTURE0, planes[0].rect.x2, planes[0].rect.y2);
   glMultiTexCoord2fARB(GL_TEXTURE1, planes[1].rect.x2, planes[1].rect.y2);
   glMultiTexCoord2fARB(GL_TEXTURE2, planes[2].rect.x2, planes[2].rect.y2);
-  glVertex4f(m_destRect.x2, m_destRect.y2, 0, 1.0f);
+  glVertex4f(m_rotatedDestCoords[2].x, m_rotatedDestCoords[2].y, 0, 1.0f );//bottom right
 
   glMultiTexCoord2fARB(GL_TEXTURE0, planes[0].rect.x1, planes[0].rect.y2);
   glMultiTexCoord2fARB(GL_TEXTURE1, planes[1].rect.x1, planes[1].rect.y2);
   glMultiTexCoord2fARB(GL_TEXTURE2, planes[2].rect.x1, planes[2].rect.y2);
-  glVertex4f(m_destRect.x1, m_destRect.y2, 0, 1.0f);
+  glVertex4f(m_rotatedDestCoords[3].x, m_rotatedDestCoords[3].y, 0, 1.0f );//bottom left
 
   glEnd();
   VerifyGLState();
@@ -1462,16 +1473,16 @@ void CLinuxRendererGL::RenderMultiPass(int index, int field)
   glBegin(GL_QUADS);
 
   glMultiTexCoord2fARB(GL_TEXTURE0, 0.0f    , 0.0f);
-  glVertex4f(m_destRect.x1, m_destRect.y1, 0, 1.0f );
+  glVertex4f(m_rotatedDestCoords[0].x, m_rotatedDestCoords[0].y, 0, 1.0f );
 
   glMultiTexCoord2fARB(GL_TEXTURE0, imgwidth, 0.0f);
-  glVertex4f(m_destRect.x2, m_destRect.y1, 0, 1.0f);
+  glVertex4f(m_rotatedDestCoords[1].x, m_rotatedDestCoords[1].y, 0, 1.0f );
 
   glMultiTexCoord2fARB(GL_TEXTURE0, imgwidth, imgheight);
-  glVertex4f(m_destRect.x2, m_destRect.y2, 0, 1.0f);
-
+  glVertex4f(m_rotatedDestCoords[2].x, m_rotatedDestCoords[2].y, 0, 1.0f );
+  
   glMultiTexCoord2fARB(GL_TEXTURE0, 0.0f    , imgheight);
-  glVertex4f(m_destRect.x1, m_destRect.y2, 0, 1.0f);
+  glVertex4f(m_rotatedDestCoords[3].x, m_rotatedDestCoords[3].y, 0, 1.0f );
 
   glEnd();
 
@@ -1539,17 +1550,17 @@ void CLinuxRendererGL::RenderVDPAU(int index, int field)
   glBegin(GL_QUADS);
   if (m_textureTarget==GL_TEXTURE_2D)
   {
-    glTexCoord2f(0.0, 0.0);  glVertex2f(m_destRect.x1, m_destRect.y1);
-    glTexCoord2f(1.0, 0.0);  glVertex2f(m_destRect.x2, m_destRect.y1);
-    glTexCoord2f(1.0, 1.0);  glVertex2f(m_destRect.x2, m_destRect.y2);
-    glTexCoord2f(0.0, 1.0);  glVertex2f(m_destRect.x1, m_destRect.y2);
+    glTexCoord2f(0.0, 0.0);  glVertex2f(m_rotatedDestCoords[0].x, m_rotatedDestCoords[0].y);
+    glTexCoord2f(1.0, 0.0);  glVertex2f(m_rotatedDestCoords[1].x, m_rotatedDestCoords[1].y);
+    glTexCoord2f(1.0, 1.0);  glVertex2f(m_rotatedDestCoords[2].x, m_rotatedDestCoords[2].y);
+    glTexCoord2f(0.0, 1.0);  glVertex2f(m_rotatedDestCoords[3].x, m_rotatedDestCoords[3].y);
   }
   else
   {
-    glTexCoord2f(m_destRect.x1, m_destRect.y1); glVertex4f(m_destRect.x1, m_destRect.y1, 0.0f, 0.0f);
-    glTexCoord2f(m_destRect.x2, m_destRect.y1); glVertex4f(m_destRect.x2, m_destRect.y1, 1.0f, 0.0f);
-    glTexCoord2f(m_destRect.x2, m_destRect.y2); glVertex4f(m_destRect.x2, m_destRect.y2, 1.0f, 1.0f);
-    glTexCoord2f(m_destRect.x1, m_destRect.y2); glVertex4f(m_destRect.x1, m_destRect.y2, 0.0f, 1.0f);
+    glTexCoord2f(m_rotatedDestCoords[0].x, m_rotatedDestCoords[0].y); glVertex4f(m_rotatedDestCoords[0].x, m_rotatedDestCoords[0].y, 0.0f, 0.0f);
+    glTexCoord2f(m_rotatedDestCoords[1].x, m_rotatedDestCoords[1].y); glVertex4f(m_rotatedDestCoords[1].x, m_rotatedDestCoords[1].y, 1.0f, 0.0f);
+    glTexCoord2f(m_rotatedDestCoords[2].x, m_rotatedDestCoords[2].y); glVertex4f(m_rotatedDestCoords[2].x, m_rotatedDestCoords[2].y, 1.0f, 1.0f);
+    glTexCoord2f(m_rotatedDestCoords[3].x, m_rotatedDestCoords[3].y); glVertex4f(m_rotatedDestCoords[3].x, m_rotatedDestCoords[3].y, 0.0f, 1.0f);
   }
   glEnd();
   VerifyGLState();
@@ -1628,10 +1639,10 @@ void CLinuxRendererGL::RenderVAAPI(int index, int field)
   VerifyGLState();
 
   glBegin(GL_QUADS);
-  glTexCoord2f(0.0, 0.0);  glVertex2f(m_destRect.x1, m_destRect.y1);
-  glTexCoord2f(1.0, 0.0);  glVertex2f(m_destRect.x2, m_destRect.y1);
-  glTexCoord2f(1.0, 1.0);  glVertex2f(m_destRect.x2, m_destRect.y2);
-  glTexCoord2f(0.0, 1.0);  glVertex2f(m_destRect.x1, m_destRect.y2);
+  glTexCoord2f(0.0, 0.0);  glVertex2f(m_rotatedDestCoords[0].x, m_rotatedDestCoords[0].y);
+  glTexCoord2f(1.0, 0.0);  glVertex2f(m_rotatedDestCoords[1].x, m_rotatedDestCoords[1].y);
+  glTexCoord2f(1.0, 1.0);  glVertex2f(m_rotatedDestCoords[2].x, m_rotatedDestCoords[2].y);
+  glTexCoord2f(0.0, 1.0);  glVertex2f(m_rotatedDestCoords[3].x, m_rotatedDestCoords[3].y);
   glEnd();
 
   VerifyGLState();
@@ -1667,16 +1678,16 @@ void CLinuxRendererGL::RenderSoftware(int index, int field)
 
   glBegin(GL_QUADS);
   glTexCoord2f(planes[0].rect.x1, planes[0].rect.y1);
-  glVertex4f(m_destRect.x1, m_destRect.y1, 0, 1.0f );
+  glVertex4f(m_rotatedDestCoords[0].x, m_rotatedDestCoords[0].y, 0, 1.0f );
 
   glTexCoord2f(planes[0].rect.x2, planes[0].rect.y1);
-  glVertex4f(m_destRect.x2, m_destRect.y1, 0, 1.0f);
+  glVertex4f(m_rotatedDestCoords[1].x, m_rotatedDestCoords[1].y, 0, 1.0f);
 
   glTexCoord2f(planes[0].rect.x2, planes[0].rect.y2);
-  glVertex4f(m_destRect.x2, m_destRect.y2, 0, 1.0f);
+  glVertex4f(m_rotatedDestCoords[2].x, m_rotatedDestCoords[2].y, 0, 1.0f);
 
   glTexCoord2f(planes[0].rect.x1, planes[0].rect.y2);
-  glVertex4f(m_destRect.x1, m_destRect.y2, 0, 1.0f);
+  glVertex4f(m_rotatedDestCoords[3].x, m_rotatedDestCoords[3].y, 0, 1.0f);
 
   glEnd();
 
@@ -1693,9 +1704,12 @@ bool CLinuxRendererGL::RenderCapture(CRenderCapture* capture)
 
   // save current video rect
   CRect saveSize = m_destRect;
-
+  
+  saveRotatedCoords();//backup current m_rotatedDestCoords
+      
   // new video rect is capture size
   m_destRect.SetRect(0, 0, (float)capture->GetWidth(), (float)capture->GetHeight());
+  syncDestRectToRotatedPoints();//syncs the changed destRect to m_rotatedDestCoords
 
   //invert Y axis to get non-inverted image
   glDisable(GL_BLEND);
@@ -1720,6 +1734,7 @@ bool CLinuxRendererGL::RenderCapture(CRenderCapture* capture)
 
   // restore original video rect
   m_destRect = saveSize;
+  restoreRotatedCoords();//restores the previous state of the rotated dest coords
 
   return true;
 }
@@ -2441,29 +2456,49 @@ void CLinuxRendererGL::UploadCVRefTexture(int index)
     YUVFIELDS &fields = m_buffers[index].fields;
     YUVPLANE  &plane  = fields[0][0];
 
-    // It is the fastest way to render a CVPixelBuffer backed
-    // with an IOSurface as there is no CPU -> GPU upload.
-    CGLContextObj cgl_ctx  = (CGLContextObj)g_Windowing.GetCGLContextObj();
-    IOSurfaceRef	surface  = CVPixelBufferGetIOSurface(cvBufferRef);
-    GLsizei       texWidth = IOSurfaceGetWidth(surface);
-    GLsizei       texHeight= IOSurfaceGetHeight(surface);
-    OSType        format_type = CVPixelBufferGetPixelFormatType(cvBufferRef);
-    size_t        rowbytes = CVPixelBufferGetBytesPerRow(cvBufferRef);
+    if (Cocoa_GetOSVersion() >= 0x1074)
+    {
+      // 10.7.4 for Retina Macbooks on Lion breaks CGLTexImageIOSurface2D/GL_YCBCR_422_APPLE,
+      // 10.8 Mountain Lion breaks CGLTexImageIOSurface2D/GL_YCBCR_422_APPLE,
+      // upload the old way.
+      CVPixelBufferLockBaseAddress(cvBufferRef, kCVPixelBufferLock_ReadOnly);
 
-    glEnable(m_textureTarget);
-    glBindTexture(m_textureTarget, plane.id);
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, rowbytes);
+      GLsizei       texHeight   = CVPixelBufferGetHeight(cvBufferRef);
+      size_t        rowbytes    = CVPixelBufferGetBytesPerRow(cvBufferRef);
+      unsigned char *bufferBase = (unsigned char*)CVPixelBufferGetBaseAddress(cvBufferRef);
 
-    if (format_type == kCVPixelFormatType_422YpCbCr8)
-      CGLTexImageIOSurface2D(cgl_ctx, m_textureTarget, GL_RGB8,
-        texWidth, texHeight, GL_YCBCR_422_APPLE, GL_UNSIGNED_SHORT_8_8_APPLE, surface, 0);
-    else if (format_type == kCVPixelFormatType_32BGRA)
-      CGLTexImageIOSurface2D(cgl_ctx, m_textureTarget, GL_RGBA8,
-        texWidth, texHeight, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, surface, 0);
+      glEnable(m_textureTarget);
+      glBindTexture(m_textureTarget, plane.id);
+      glTexParameteri(m_textureTarget, GL_TEXTURE_STORAGE_HINT_APPLE , GL_STORAGE_CACHED_APPLE);
+      glTexSubImage2D(m_textureTarget, 0, 0, 0, rowbytes/2, texHeight, GL_YCBCR_422_APPLE, GL_UNSIGNED_SHORT_8_8_APPLE, bufferBase);
+      glBindTexture(m_textureTarget, 0);
+      glDisable(m_textureTarget);
 
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-    glBindTexture(m_textureTarget, 0);
-    glDisable(m_textureTarget);
+      CVPixelBufferUnlockBaseAddress(cvBufferRef, kCVPixelBufferLock_ReadOnly);
+    }
+    else
+    {
+      // It is the fastest way to render a CVPixelBuffer backed
+      // with an IOSurface as there is no CPU -> GPU upload.
+      CGLContextObj cgl_ctx  = (CGLContextObj)g_Windowing.GetCGLContextObj();
+      IOSurfaceRef	surface  = CVPixelBufferGetIOSurface(cvBufferRef);
+      GLsizei       texWidth = IOSurfaceGetWidth(surface);
+      GLsizei       texHeight= IOSurfaceGetHeight(surface);
+      OSType        format_type = CVPixelBufferGetPixelFormatType(cvBufferRef);
+
+      glEnable(m_textureTarget);
+      glBindTexture(m_textureTarget, plane.id);
+
+      if (format_type == kCVPixelFormatType_422YpCbCr8)
+        CGLTexImageIOSurface2D(cgl_ctx, m_textureTarget, GL_RGB8,
+          texWidth, texHeight, GL_YCBCR_422_APPLE, GL_UNSIGNED_SHORT_8_8_APPLE, surface, 0);
+      else if (format_type == kCVPixelFormatType_32BGRA)
+        CGLTexImageIOSurface2D(cgl_ctx, m_textureTarget, GL_RGBA8,
+          texWidth, texHeight, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, surface, 0);
+
+      glBindTexture(m_textureTarget, 0);
+      glDisable(m_textureTarget);
+    }
 
     CVBufferRelease(cvBufferRef);
     m_buffers[index].cvBufferRef = NULL;
@@ -2505,21 +2540,35 @@ bool CLinuxRendererGL::CreateCVRefTexture(int index)
   memset(&im    , 0, sizeof(im));
   memset(&fields, 0, sizeof(fields));
 
-  im.height = m_sourceHeight;
+  im.bpp    = 1;
   im.width  = m_sourceWidth;
+  im.height = m_sourceHeight;
+  im.cshift_x = 0;
+  im.cshift_y = 0;
 
-  plane.texwidth  = im.width;
-  plane.texheight = im.height;
+  plane.texwidth  = NP2(im.width);
+  plane.texheight = NP2(im.height);
   plane.pixpertex_x = 1;
   plane.pixpertex_y = 1;
 
-  if(m_renderMethod & RENDER_POT)
-  {
-    plane.texwidth  = NP2(plane.texwidth);
-    plane.texheight = NP2(plane.texheight);
-  }
   glEnable(m_textureTarget);
   glGenTextures(1, &plane.id);
+  if (Cocoa_GetOSVersion() >= 0x1074)
+  {
+    // 10.7.4 for Retina Macbooks on Lion breaks CGLTexImageIOSurface2D/GL_YCBCR_422_APPLE,
+    // 10.8 Mountain Lion breaks CGLTexImageIOSurface2D/GL_YCBCR_422_APPLE,
+    // upload the old way.
+    glBindTexture(m_textureTarget, plane.id);
+    // Set storage hint. Can also use GL_STORAGE_SHARED_APPLE see docs.
+    //glTexParameteri(m_textureTarget, GL_TEXTURE_STORAGE_HINT_APPLE , GL_STORAGE_CACHED_APPLE);
+    glTexParameteri(m_textureTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(m_textureTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // This is necessary for non-power-of-two textures
+    glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(m_textureTarget, 0, GL_RGBA, plane.texwidth, plane.texheight, 0, GL_YCBCR_422_APPLE, GL_UNSIGNED_SHORT_8_8_APPLE, NULL);
+    glBindTexture(m_textureTarget, 0);
+  }
   glDisable(m_textureTarget);
 
   m_eventTexturesDone[index]->Set();
@@ -2829,6 +2878,7 @@ void CLinuxRendererGL::ToRGBFrame(YV12Image* im, unsigned flipIndexPlane, unsign
                                                  im->width, im->height, srcFormat,
                                                  im->width, im->height, PIX_FMT_BGRA,
                                                  SWS_FAST_BILINEAR | SwScaleCPUFlags(), NULL, NULL, NULL);
+
   uint8_t *dst[]       = { m_rgbBuffer, 0, 0, 0 };
   int      dstStride[] = { m_sourceWidth * 4, 0, 0, 0 };
   m_dllSwScale->sws_scale(m_context, src, srcStride, 0, im->height, dst, dstStride);
@@ -3150,6 +3200,9 @@ bool CLinuxRendererGL::Supports(ERENDERFEATURE feature)
         (m_renderMethod & RENDER_VDPAU) || (m_renderMethod & RENDER_VAAPI))
       return true;
   }
+
+  if (feature == RENDERFEATURE_ROTATION)
+    return true;
 
   return false;
 }

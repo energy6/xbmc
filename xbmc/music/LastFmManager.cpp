@@ -24,9 +24,9 @@
 #include "Album.h"
 #include "Artist.h"
 #include "Application.h"
+#include "ApplicationMessenger.h"
 #include "PlayListPlayer.h"
 #include "playlists/PlayListFactory.h"
-#include "pictures/Picture.h"
 #include "utils/md5.h"
 #include "filesystem/File.h"
 #include "filesystem/CurlFile.h"
@@ -424,35 +424,6 @@ void CLastFmManager::CacheTrackThumb(const int nrInitialTracksToAdd)
     CFileItemPtr item = (*m_RadioTrackQueue)[i];
     if (!item->GetMusicInfoTag()->Loaded())
     {
-      //cache albumthumb, GetThumbnailImage contains the url to cache
-      if (item->HasThumbnail())
-      {
-        CStdString coverUrl = item->GetThumbnailImage();
-        CStdString crcFile;
-        CStdString cachedFile;
-        CStdString thumbFile;
-
-        Crc32 crc;
-        crc.ComputeFromLowerCase(coverUrl);
-        crcFile.Format("%08x.tbn", (__int32)crc);
-        URIUtils::AddFileToFolder(g_advancedSettings.m_cachePath, crcFile, cachedFile);
-        URIUtils::AddFileToFolder(g_settings.GetLastFMThumbFolder(), crcFile, thumbFile);
-        item->SetThumbnailImage("");
-        try
-        {
-          //download to temp, then make a thumb
-          if (CFile::Exists(thumbFile) || (http.Download(coverUrl, cachedFile) && CPicture::CreateThumbnail(cachedFile, thumbFile)))
-          {
-            if (CFile::Exists(cachedFile))
-              CFile::Delete(cachedFile);
-            item->SetThumbnailImage(thumbFile);
-          }
-        }
-        catch(...)
-        {
-          CLog::Log(LOGERROR, "LastFmManager: exception while caching %s to %s.", coverUrl.c_str(), thumbFile.c_str());
-        }
-      }
       if (!item->HasThumbnail())
       {
         item->SetThumbnailImage("DefaultAlbumCover.png");
@@ -882,7 +853,7 @@ bool CLastFmManager::Love(const CMusicInfoTag& musicinfotag)
     //update the rating to 5, we loved it.
     CMusicInfoTag newTag(musicinfotag);
     newTag.SetRating('5');
-    g_infoManager.SetCurrentSongTag(newTag);
+    CApplicationMessenger::Get().SetCurrentSongTag(newTag);
     //try updating the rating in the database if it's a local file.
     CMusicDatabase musicdatabase;
     if (musicdatabase.Open())
@@ -911,7 +882,7 @@ bool CLastFmManager::Ban(const CMusicInfoTag& musicinfotag)
   if (CallXmlRpc("banTrack", StringUtils::Join(musicinfotag.GetArtist(), g_advancedSettings.m_musicItemSeparator), musicinfotag.GetTitle()))
   {
     //we banned this track so skip to the next track
-    g_application.getApplicationMessenger().ExecBuiltIn("playercontrol(next)");
+    CApplicationMessenger::Get().ExecBuiltIn("playercontrol(next)");
     m_CurrentSong.IsBanned = true;
     return true;
   }

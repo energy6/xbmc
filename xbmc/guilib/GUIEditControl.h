@@ -41,6 +41,7 @@ class CGUIEditControl : public CGUIButtonControl
 {
 public:
   enum INPUT_TYPE {
+                    INPUT_TYPE_READONLY = -1,
                     INPUT_TYPE_TEXT = 0,
                     INPUT_TYPE_NUMBER,
                     INPUT_TYPE_SECONDS,
@@ -50,7 +51,8 @@ public:
                     INPUT_TYPE_PASSWORD,
                     INPUT_TYPE_PASSWORD_MD5,
                     INPUT_TYPE_SEARCH,
-                    INPUT_TYPE_FILTER
+                    INPUT_TYPE_FILTER,
+                    INPUT_TYPE_PASSWORD_NUMBER_VERIFY_NEW
                   };
 
   CGUIEditControl(int parentID, int controlID, float posX, float posY,
@@ -81,6 +83,7 @@ public:
 
 protected:
   virtual void ProcessText(unsigned int currentTime);
+  virtual void RenderText();
   CStdStringW GetDisplayedText() const;
   void RecalcLabelPosition();
   void ValidateCursor();
@@ -99,6 +102,7 @@ protected:
   CGUIInfoLabel m_hintInfo;
   float m_textOffset;
   float m_textWidth;
+  CRect m_clipRect; ///< clipping rect for the second label
 
   static const int spaceWidth = 5;
 

@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -79,18 +79,18 @@ void CGUIDialogPVRGuideSearch::UpdateChannelSpin(void)
   int iGroupId = (iChannelGroup == EPG_SEARCH_UNSET) ?
       XBMC_INTERNAL_GROUP_TV :
       iChannelGroup;
-  const CPVRChannelGroup *group = g_PVRChannelGroups->GetByIdFromAll(iGroupId);
+  CPVRChannelGroupPtr group = g_PVRChannelGroups->GetByIdFromAll(iGroupId);
   if (!group)
     group = g_PVRChannelGroups->GetGroupAllTV();
 
   for (int iChannelPtr = 0; iChannelPtr < group->Size(); iChannelPtr++)
   {
-    const CPVRChannel *channel = group->GetByIndex(iChannelPtr);
-    if (!channel)
+    CFileItemPtr channel = group->GetByIndex(iChannelPtr);
+    if (!channel || !channel->HasPVRChannelInfoTag())
       continue;
 
-    int iChannelNumber = group->GetChannelNumber(*channel);
-    pSpin->AddLabel(channel->ChannelName().c_str(), iChannelNumber);
+    int iChannelNumber = group->GetChannelNumber(*channel->GetPVRChannelInfoTag());
+    pSpin->AddLabel(channel->GetPVRChannelInfoTag()->ChannelName().c_str(), iChannelNumber);
   }
 }
 

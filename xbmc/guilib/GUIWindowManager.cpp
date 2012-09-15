@@ -23,6 +23,7 @@
 #include "GUIAudioManager.h"
 #include "GUIDialog.h"
 #include "Application.h"
+#include "ApplicationMessenger.h"
 #include "GUIPassword.h"
 #include "GUIInfoManager.h"
 #include "threads/SingleLock.h"
@@ -183,17 +184,17 @@ void CGUIWindowManager::Add(CGUIWindow* pWindow)
   }
   // push back all the windows if there are more than one covered by this class
   CSingleLock lock(g_graphicsContext);
-  for (int i = 0; i < pWindow->GetIDRange(); i++)
+  const vector<int>& idRange = pWindow->GetIDRange();
+  for (vector<int>::const_iterator idIt = idRange.begin(); idIt != idRange.end() ; idIt++)
   {
-    WindowMap::iterator it = m_mapWindows.find(pWindow->GetID() + i);
+    WindowMap::iterator it = m_mapWindows.find(*idIt);
     if (it != m_mapWindows.end())
     {
       CLog::Log(LOGERROR, "Error, trying to add a second window with id %u "
-                          "to the window manager",
-                pWindow->GetID());
+                          "to the window manager", *idIt);
       return;
     }
-    m_mapWindows.insert(pair<int, CGUIWindow *>(pWindow->GetID() + i, pWindow));
+    m_mapWindows.insert(pair<int, CGUIWindow *>(*idIt, pWindow));
   }
 }
 
@@ -342,7 +343,7 @@ void CGUIWindowManager::ActivateWindow(int iWindowID, const vector<CStdString>& 
   {
     // make sure graphics lock is not held
     CSingleExit leaveIt(g_graphicsContext);
-    g_application.getApplicationMessenger().ActivateWindow(iWindowID, params, swappingWindows);
+    CApplicationMessenger::Get().ActivateWindow(iWindowID, params, swappingWindows);
   }
   else
   {
@@ -970,7 +971,7 @@ void CGUIWindowManager::CloseWindowSync(CGUIWindow *window, int nextWindowID /*=
 {
   window->Close(false, nextWindowID);
   while (window->IsAnimating(ANIM_TYPE_WINDOW_CLOSE))
-    g_windowManager.ProcessRenderLoop(true);
+    ProcessRenderLoop(true);
 }
 
 #ifdef _DEBUG

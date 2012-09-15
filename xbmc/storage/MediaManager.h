@@ -25,7 +25,6 @@
 #ifdef HAS_DVD_DRIVE
 #include "cdioSupport.h"
 #endif
-#include "URL.h"
 #include "utils/Job.h"
 #include "IStorageProvider.h"
 #include "threads/CriticalSection.h"
@@ -97,7 +96,7 @@ protected:
   bool HashDVD(const CStdString& dvdpath, uint32_t& crc);
 #endif
   bool m_bhasoptical;
-  CStdString strFirstAvailDrive;
+  CStdString m_strFirstAvailDrive;
 
 private:
   IStorageProvider *m_platformStorage;

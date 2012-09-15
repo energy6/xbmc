@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2005-2010 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -38,6 +38,8 @@ extern "C" {
 #endif
 }
 #endif
+
+#include "pvr/addons/PVRClient.h"
 
 class CDVDDemuxPVRClient;
 struct PVR_STREAM_PROPERTIES;
@@ -100,6 +102,7 @@ protected:
   #define MAX_STREAMS 100
 #endif
   CDemuxStream* m_streams[MAX_STREAMS]; // maximum number of streams that ffmpeg can handle
+  boost::shared_ptr<PVR::CPVRClient> m_pvrClient;
 
 private:
   void RequestStreams();

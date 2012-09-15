@@ -139,16 +139,12 @@ public:
   virtual int  GetCurrentScreen();
   virtual void ShowOSMouse(bool show);
   virtual bool WindowedMode() { return true; }
-  virtual bool HasInertialGestures(){ return true; }//if win32 has touchscreen - it uses the win32 gesture api for inertial scrolling 
+  virtual bool HasInertialGestures(){ return true; }//if win32 has touchscreen - it uses the win32 gesture api for inertial scrolling
 
   virtual bool Minimize();
   virtual bool Restore();
   virtual bool Hide();
   virtual bool Show(bool raise = true);
-
-   // OS System screensaver
-  virtual void EnableSystemScreenSaver(bool bEnable);
-  virtual bool IsSystemScreenSaverEnabled();
 
   // CWinSystemWin32
   HWND GetHwnd() { return m_hWnd; }

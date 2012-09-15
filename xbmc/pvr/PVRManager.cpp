@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -20,8 +20,10 @@
  */
 
 #include "Application.h"
+#include "ApplicationMessenger.h"
 #include "GUIInfoManager.h"
 #include "dialogs/GUIDialogOK.h"
+#include "dialogs/GUIDialogNumeric.h"
 #include "dialogs/GUIDialogProgress.h"
 #include "dialogs/GUIDialogExtendedProgressBar.h"
 #include "dialogs/GUIDialogKaiToast.h"
@@ -34,14 +36,18 @@
 #include "threads/SingleLock.h"
 #include "windows/GUIWindowPVR.h"
 #include "utils/log.h"
+#include "utils/Stopwatch.h"
 #include "utils/StringUtils.h"
 #include "threads/Atomics.h"
+#include "windows/GUIWindowPVRCommon.h"
 
 #include "PVRManager.h"
 #include "PVRDatabase.h"
 #include "PVRGUIInfo.h"
 #include "addons/PVRClients.h"
+#include "channels/PVRChannel.h"
 #include "channels/PVRChannelGroupsContainer.h"
+#include "channels/PVRChannelGroupInternal.h"
 #include "epg/EpgContainer.h"
 #include "recordings/PVRRecordings.h"
 #include "timers/PVRTimers.h"
@@ -60,9 +66,9 @@ CPVRManager::CPVRManager(void) :
     m_guiInfo(NULL),
     m_triggerEvent(true),
     m_currentFile(NULL),
-    m_database(new CPVRDatabase),
+    m_database(NULL),
     m_bFirstStart(true),
-    m_loadingProgressDialog(NULL),
+    m_progressHandle(NULL),
     m_managerState(ManagerStateStopped)
 {
   ResetProperties();
@@ -71,8 +77,6 @@ CPVRManager::CPVRManager(void) :
 CPVRManager::~CPVRManager(void)
 {
   Stop();
-  if (m_database->IsOpen())
-    m_database->Close();
   CLog::Log(LOGDEBUG,"PVRManager - destroyed");
 }
 
@@ -86,18 +90,16 @@ void CPVRManager::Cleanup(void)
 {
   CSingleLock lock(m_critSection);
 
-  if (m_addons)        delete m_addons;        m_addons = NULL;
-  if (m_guiInfo)       delete m_guiInfo;       m_guiInfo = NULL;
-  if (m_timers)        delete m_timers;        m_timers = NULL;
-  if (m_recordings)    delete m_recordings;    m_recordings = NULL;
-  if (m_channelGroups) delete m_channelGroups; m_channelGroups = NULL;
+  SAFE_DELETE(m_addons);
+  SAFE_DELETE(m_guiInfo);
+  SAFE_DELETE(m_timers);
+  SAFE_DELETE(m_recordings);
+  SAFE_DELETE(m_channelGroups);
+  SAFE_DELETE(m_parentalTimer);
+  SAFE_DELETE(m_database);
   m_triggerEvent.Set();
 
   m_currentFile           = NULL;
-  m_PreviousChannel[0]    = -1;
-  m_PreviousChannel[1]    = -1;
-  m_PreviousChannelIndex  = 0;
-  m_LastChannel           = 0;
   m_bIsSwitchingChannels  = false;
 
   for (unsigned int iJobPtr = 0; iJobPtr < m_pendingUpdates.size(); iJobPtr++)
@@ -119,6 +121,7 @@ void CPVRManager::ResetProperties(void)
     m_recordings    = new CPVRRecordings;
     m_timers        = new CPVRTimers;
     m_guiInfo       = new CPVRGUIInfo;
+    m_parentalTimer = new CStopWatch;
   }
 }
 
@@ -136,6 +139,9 @@ void CPVRManager::Start(void)
   ResetProperties();
   SetState(ManagerStateStarting);
 
+  /* create and open database */
+  if (!m_database)
+    m_database = new CPVRDatabase;
   m_database->Open();
 
   /* create the supervisor thread to do all background activities */
@@ -160,7 +166,7 @@ void CPVRManager::Stop(void)
   if (IsPlaying())
   {
     CLog::Log(LOGNOTICE,"PVRManager - %s - stopping PVR playback", __FUNCTION__);
-    g_application.getApplicationMessenger().MediaStop();
+    CApplicationMessenger::Get().MediaStop();
   }
 
   /* stop all update threads */
@@ -168,6 +174,10 @@ void CPVRManager::Stop(void)
 
   /* executes the set wakeup command */
   SetWakeupCommand();
+
+  /* close database */
+  if (m_database->IsOpen())
+    m_database->Close();
 
   /* unload all data */
   Cleanup();
@@ -279,8 +289,10 @@ void CPVRManager::StopUpdateThreads(void)
   SetState(ManagerStateInterrupted);
 
   StopThread();
-  m_guiInfo->Stop();
-  m_addons->Stop();
+  if (m_guiInfo)
+    m_guiInfo->Stop();
+  if (m_addons)
+    m_addons->Stop();
 }
 
 bool CPVRManager::Load(void)
@@ -297,29 +309,29 @@ bool CPVRManager::Load(void)
 
   CLog::Log(LOGDEBUG, "PVRManager - %s - active clients found. continue to start", __FUNCTION__);
 
+  CGUIWindowPVR *pWindow = (CGUIWindowPVR *) g_windowManager.GetWindow(WINDOW_PVR);
+  if (pWindow)
+    pWindow->Reset();
+
   /* load all channels and groups */
-  ShowProgressDialog(g_localizeStrings.Get(19236), 0);
+  ShowProgressDialog(g_localizeStrings.Get(19236), 0); // Loading channels from clients
   if (!m_channelGroups->Load() || GetState() != ManagerStateStarting)
     return false;
 
   /* get timers from the backends */
-  ShowProgressDialog(g_localizeStrings.Get(19237), 50);
+  ShowProgressDialog(g_localizeStrings.Get(19237), 50); // Loading timers from clients
   m_timers->Load();
 
   /* get recordings from the backend */
-  ShowProgressDialog(g_localizeStrings.Get(19238), 75);
+  ShowProgressDialog(g_localizeStrings.Get(19238), 75); // Loading recordings from clients
   m_recordings->Load();
 
   CSingleLock lock(m_critSection);
   if (GetState() != ManagerStateStarting)
     return false;
 
-  CGUIWindowPVR *pWindow = (CGUIWindowPVR *) g_windowManager.GetWindow(WINDOW_PVR);
-  if (pWindow)
-    pWindow->Reset();
-
   /* start the other pvr related update threads */
-  ShowProgressDialog(g_localizeStrings.Get(19239), 85);
+  ShowProgressDialog(g_localizeStrings.Get(19239), 85); // Starting background threads
   m_guiInfo->Start();
 
   /* close the progess dialog */
@@ -330,24 +342,22 @@ bool CPVRManager::Load(void)
 
 void CPVRManager::ShowProgressDialog(const CStdString &strText, int iProgress)
 {
-  if (!m_loadingProgressDialog)
+  if (!m_progressHandle)
   {
-    m_loadingProgressDialog = (CGUIDialogExtendedProgressBar *)g_windowManager.GetWindow(WINDOW_DIALOG_EXT_PROGRESS);
-    m_loadingProgressDialog->Show();
-    m_loadingProgressDialog->SetHeader(g_localizeStrings.Get(19235));
+    CGUIDialogExtendedProgressBar *loadingProgressDialog = (CGUIDialogExtendedProgressBar *)g_windowManager.GetWindow(WINDOW_DIALOG_EXT_PROGRESS);
+    m_progressHandle = loadingProgressDialog->GetHandle(g_localizeStrings.Get(19235)); // PVR manager is starting up
   }
 
-  m_loadingProgressDialog->SetProgress(iProgress, 100);
-  m_loadingProgressDialog->SetTitle(strText);
-  m_loadingProgressDialog->UpdateState();
+  m_progressHandle->SetPercentage((float)iProgress);
+  m_progressHandle->SetText(strText);
 }
 
 void CPVRManager::HideProgressDialog(void)
 {
-  if (m_loadingProgressDialog)
+  if (m_progressHandle)
   {
-    m_loadingProgressDialog->Close(true, 0, true, false);
-    m_loadingProgressDialog = NULL;
+    m_progressHandle->MarkFinished();
+    m_progressHandle = NULL;
   }
 }
 
@@ -355,21 +365,21 @@ bool CPVRManager::ChannelSwitch(unsigned int iChannelNumber)
 {
   CSingleLock lock(m_critSection);
 
-  const CPVRChannelGroup *playingGroup = GetPlayingGroup(m_addons->IsPlayingRadio());
-  if (playingGroup == NULL)
+  CPVRChannelGroupPtr playingGroup = GetPlayingGroup(m_addons->IsPlayingRadio());
+  if (!playingGroup)
   {
     CLog::Log(LOGERROR, "PVRManager - %s - cannot get the selected group", __FUNCTION__);
     return false;
   }
 
-  const CPVRChannel *channel = playingGroup->GetByChannelNumber(iChannelNumber);
-  if (channel == NULL)
+  CFileItemPtr channel = playingGroup->GetByChannelNumber(iChannelNumber);
+  if (!channel || !channel->HasPVRChannelInfoTag())
   {
     CLog::Log(LOGERROR, "PVRManager - %s - cannot find channel %d", __FUNCTION__, iChannelNumber);
     return false;
   }
 
-  return PerformChannelSwitch(*channel, false);
+  return PerformChannelSwitch(*channel->GetPVRChannelInfoTag(), false);
 }
 
 bool CPVRManager::ChannelUpDown(unsigned int *iNewChannelNumber, bool bPreview, bool bUp)
@@ -379,13 +389,17 @@ bool CPVRManager::ChannelUpDown(unsigned int *iNewChannelNumber, bool bPreview, 
   {
     CFileItem currentFile(g_application.CurrentFileItem());
     CPVRChannel *currentChannel = currentFile.GetPVRChannelInfoTag();
-    const CPVRChannelGroup *group = GetPlayingGroup(currentChannel->IsRadio());
+    CPVRChannelGroupPtr group = GetPlayingGroup(currentChannel->IsRadio());
     if (group)
     {
-      const CPVRChannel *newChannel = bUp ? group->GetByChannelUp(*currentChannel) : group->GetByChannelDown(*currentChannel);
-      if (newChannel && PerformChannelSwitch(*newChannel, bPreview))
+      CFileItemPtr newChannel = bUp ?
+          group->GetByChannelUp(*currentChannel) :
+          group->GetByChannelDown(*currentChannel);
+
+      if (newChannel && newChannel->HasPVRChannelInfoTag() &&
+          PerformChannelSwitch(*newChannel->GetPVRChannelInfoTag(), bPreview))
       {
-        *iNewChannelNumber = newChannel->ChannelNumber();
+        *iNewChannelNumber = newChannel->GetPVRChannelInfoTag()->ChannelNumber();
         bReturn = true;
       }
     }
@@ -396,19 +410,19 @@ bool CPVRManager::ChannelUpDown(unsigned int *iNewChannelNumber, bool bPreview, 
 
 bool CPVRManager::ContinueLastChannel(void)
 {
-  CSingleLock lock(m_critSection);
-  if (!m_bFirstStart)
-    return true;
-  m_bFirstStart = false;
-  lock.Leave();
+  {
+    CSingleLock lock(m_critSection);
+    if (!m_bFirstStart)
+      return true;
+    m_bFirstStart = false;
+  }
 
   bool bReturn(false);
-  const CPVRChannel *channel = m_channelGroups->GetLastPlayedChannel();
-  if (channel != NULL)
+  CFileItemPtr channel = m_channelGroups->GetLastPlayedChannel();
+  if (channel && channel->HasPVRChannelInfoTag())
   {
-    CLog::Log(LOGNOTICE, "PVRManager - %s - continue playback on channel '%s'",
-        __FUNCTION__, channel->ChannelName().c_str());
-    bReturn = StartPlayback(channel, (g_guiSettings.GetInt("pvrplayback.startlast") == START_LAST_CHANNEL_MIN));
+    CLog::Log(LOGNOTICE, "PVRManager - %s - continue playback on channel '%s'", __FUNCTION__, channel->GetPVRChannelInfoTag()->ChannelName().c_str());
+    bReturn = StartPlayback(channel->GetPVRChannelInfoTag(), (g_guiSettings.GetInt("pvrplayback.startlast") == START_LAST_CHANNEL_MIN));
   }
 
   return bReturn;
@@ -425,7 +439,7 @@ void CPVRManager::ResetDatabase(bool bShowProgress /* = true */)
   {
     pDlgProgress = (CGUIDialogProgress*)g_windowManager.GetWindow(WINDOW_DIALOG_PROGRESS);
     pDlgProgress->SetLine(0, StringUtils::EmptyString);
-    pDlgProgress->SetLine(1, g_localizeStrings.Get(19186));
+    pDlgProgress->SetLine(1, g_localizeStrings.Get(19186)); // All data in the PVR database is being erased
     pDlgProgress->SetLine(2, StringUtils::EmptyString);
     pDlgProgress->StartModal();
     pDlgProgress->Progress();
@@ -434,7 +448,7 @@ void CPVRManager::ResetDatabase(bool bShowProgress /* = true */)
   if (m_addons && m_addons->IsPlaying())
   {
     CLog::Log(LOGNOTICE,"PVRManager - %s - stopping playback", __FUNCTION__);
-    g_application.getApplicationMessenger().MediaStop();
+    CApplicationMessenger::Get().MediaStop();
   }
 
   if (bShowProgress)
@@ -452,6 +466,9 @@ void CPVRManager::ResetDatabase(bool bShowProgress /* = true */)
     pDlgProgress->SetPercentage(20);
     pDlgProgress->Progress();
   }
+
+  if (!m_database)
+    m_database = new CPVRDatabase;
 
   if (m_database && m_database->Open())
   {
@@ -526,8 +543,8 @@ void CPVRManager::ResetEPG(void)
 
   if (g_guiSettings.GetBool("pvrmanager.enabled"))
   {
-    m_channelGroups->GetGroupAllTV()->CreateChannelEpgs(true);
-    m_channelGroups->GetGroupAllRadio()->CreateChannelEpgs(true);
+    static_cast<CPVRChannelGroupInternal *>(m_channelGroups->GetGroupAllTV().get())->CreateChannelEpgs(true);
+    static_cast<CPVRChannelGroupInternal *>(m_channelGroups->GetGroupAllRadio().get())->CreateChannelEpgs(true);
     g_EpgContainer.Start();
     StartUpdateThreads();
   }
@@ -538,18 +555,18 @@ bool CPVRManager::IsPlaying(void) const
   return IsStarted() && m_addons && m_addons->IsPlaying();
 }
 
-bool CPVRManager::GetCurrentChannel(CPVRChannel &channel) const
+bool CPVRManager::GetCurrentChannel(CPVRChannelPtr &channel) const
 {
-  return IsPlaying() && m_addons && m_addons->GetPlayingChannel(channel);
+  return m_addons && m_addons->GetPlayingChannel(channel);
 }
 
 int CPVRManager::GetCurrentEpg(CFileItemList &results) const
 {
   int iReturn = -1;
 
-  CPVRChannel channel;
+  CPVRChannelPtr channel;
   if (m_addons->GetPlayingChannel(channel))
-    iReturn = channel.GetEPG(results);
+    iReturn = channel->GetEPG(results);
   else
     CLog::Log(LOGDEBUG,"PVRManager - %s - no current channel set", __FUNCTION__);
 
@@ -565,29 +582,22 @@ void CPVRManager::ResetPlayingTag(void)
 
 int CPVRManager::GetPreviousChannel(void)
 {
-  //XXX this must be the craziest way to store the last channel
-  int iReturn = -1;
-  CPVRChannel channel;
-  if (m_addons->GetPlayingChannel(channel))
+  CPVRChannelPtr currentChannel;
+  if (GetCurrentChannel(currentChannel))
   {
-    int iLastChannel = channel.ChannelNumber();
-
-    if ((m_PreviousChannel[m_PreviousChannelIndex ^ 1] == iLastChannel || iLastChannel != m_PreviousChannel[0]) &&
-        iLastChannel != m_PreviousChannel[1])
-      m_PreviousChannelIndex ^= 1;
-
-    iReturn = m_PreviousChannel[m_PreviousChannelIndex ^= 1];
+    CPVRChannelGroupPtr selectedGroup = GetPlayingGroup(currentChannel->IsRadio());
+    CFileItemPtr channel = selectedGroup->GetLastPlayedChannel(currentChannel->ChannelID());
+    if (channel && channel->HasPVRChannelInfoTag())
+      return channel->GetPVRChannelInfoTag()->ChannelNumber();
   }
-
-  return iReturn;
+  return -1;
 }
 
 bool CPVRManager::ToggleRecordingOnChannel(unsigned int iChannelId)
 {
   bool bReturn = false;
 
-  CPVRChannel *channel;
-  channel = m_channelGroups->GetChannelById(iChannelId);
+  CPVRChannelPtr channel = m_channelGroups->GetChannelById(iChannelId);
   if (!channel)
     return bReturn;
 
@@ -596,11 +606,9 @@ bool CPVRManager::ToggleRecordingOnChannel(unsigned int iChannelId)
     /* timers are supported on this channel */
     if (!channel->IsRecording())
     {
-      CPVRTimerInfoTag *newTimer = m_timers->InstantTimer(channel);
-      if (!newTimer)
+      bReturn = m_timers->InstantTimer(*channel);
+      if (!bReturn)
         CGUIDialogOK::ShowAndGetInput(19033,0,19164,0);
-      else
-        bReturn = true;
     }
     else
     {
@@ -616,29 +624,80 @@ bool CPVRManager::StartRecordingOnPlayingChannel(bool bOnOff)
 {
   bool bReturn = false;
 
-  CPVRChannel channel;
+  CPVRChannelPtr channel;
   if (!m_addons->GetPlayingChannel(channel))
     return bReturn;
 
-  if (m_addons->HasTimerSupport(channel.ClientID()))
+  if (m_addons->HasTimerSupport(channel->ClientID()))
   {
     /* timers are supported on this channel */
-    if (bOnOff && !channel.IsRecording())
+    if (bOnOff && !channel->IsRecording())
     {
-      CPVRTimerInfoTag *newTimer = m_timers->InstantTimer(&channel);
-      if (!newTimer)
+      bReturn = m_timers->InstantTimer(*channel);
+      if (!bReturn)
         CGUIDialogOK::ShowAndGetInput(19033,0,19164,0);
-      else
-        bReturn = true;
     }
-    else if (!bOnOff && channel.IsRecording())
+    else if (!bOnOff && channel->IsRecording())
     {
       /* delete active timers */
-      bReturn = m_timers->DeleteTimersOnChannel(channel, false, true);
+      bReturn = m_timers->DeleteTimersOnChannel(*channel, false, true);
     }
   }
 
   return bReturn;
+}
+
+bool CPVRManager::CheckParentalLock(const CPVRChannel &channel)
+{
+  bool bReturn = !IsParentalLocked(channel) ||
+      CheckParentalPIN();
+
+  if (!bReturn)
+    CLog::Log(LOGERROR, "PVRManager - %s - parental lock verification failed for channel '%s': wrong PIN entered.", __FUNCTION__, channel.ChannelName().c_str());
+
+  return bReturn;
+}
+
+bool CPVRManager::IsParentalLocked(const CPVRChannel &channel)
+{
+  bool bReturn(false);
+  CPVRChannelPtr currentChannel(new CPVRChannel(false));
+
+  if (// different channel
+      (!GetCurrentChannel(currentChannel) || channel != *currentChannel) &&
+      // parental control enabled
+      g_guiSettings.GetBool("pvrparental.enabled") &&
+      // channel is locked
+      channel.IsLocked())
+  {
+    float parentalDurationMs = g_guiSettings.GetInt("pvrparental.duration") * 1000.0f;
+    bReturn = m_parentalTimer &&
+        (!m_parentalTimer->IsRunning() ||
+          m_parentalTimer->GetElapsedMilliseconds() > parentalDurationMs);
+  }
+
+  return bReturn;
+}
+
+bool CPVRManager::CheckParentalPIN(const char *strTitle /* = NULL */)
+{
+  CStdString pinCode = g_guiSettings.GetString("pvrparental.pin");
+
+  if (!g_guiSettings.GetBool("pvrparental.enabled") || pinCode.empty())
+    return true;
+
+  // Locked channel. Enter PIN:
+  bool bValidPIN = CGUIDialogNumeric::ShowAndVerifyInput(pinCode, strTitle ? strTitle : g_localizeStrings.Get(19263).c_str(), true);
+  if (!bValidPIN)
+    // display message: The entered PIN number was incorrect
+    CGUIDialogOK::ShowAndGetInput(19264,0,19265,0);
+  else if (m_parentalTimer)
+  {
+    // reset the timer
+    m_parentalTimer->StartZero();
+  }
+
+  return bValidPIN;
 }
 
 void CPVRManager::SaveCurrentChannelSettings(void)
@@ -651,12 +710,12 @@ void CPVRManager::LoadCurrentChannelSettings()
   m_addons->LoadCurrentChannelSettings();
 }
 
-void CPVRManager::SetPlayingGroup(CPVRChannelGroup *group)
+void CPVRManager::SetPlayingGroup(CPVRChannelGroupPtr group)
 {
   m_channelGroups->Get(group->IsRadio())->SetSelectedGroup(group);
 }
 
-CPVRChannelGroup *CPVRManager::GetPlayingGroup(bool bRadio /* = false */)
+CPVRChannelGroupPtr CPVRManager::GetPlayingGroup(bool bRadio /* = false */)
 {
   return m_channelGroups->GetSelectedGroup(bRadio);
 }
@@ -688,18 +747,25 @@ bool CPVRChannelSettingsSaveJob::DoWork(void)
   return true;
 }
 
-bool CPVRManager::OpenLiveStream(const CPVRChannel &tag)
+bool CPVRManager::OpenLiveStream(const CFileItem &channel)
 {
   bool bReturn(false);
-  CLog::Log(LOGDEBUG,"PVRManager - %s - opening live stream on channel '%s'",
-      __FUNCTION__, tag.ChannelName().c_str());
+  if (!channel.HasPVRChannelInfoTag())
+    return bReturn;
 
-  if ((bReturn = m_addons->OpenLiveStream(tag)) != false)
+  CLog::Log(LOGDEBUG,"PVRManager - %s - opening live stream on channel '%s'",
+      __FUNCTION__, channel.GetPVRChannelInfoTag()->ChannelName().c_str());
+
+  // check if we're allowed to play this file
+  if (IsParentalLocked(*channel.GetPVRChannelInfoTag()))
+    return bReturn;
+
+  if ((bReturn = m_addons->OpenStream(*channel.GetPVRChannelInfoTag(), false)) != false)
   {
     CSingleLock lock(m_critSection);
     if(m_currentFile)
       delete m_currentFile;
-    m_currentFile = new CFileItem(tag);
+    m_currentFile = new CFileItem(channel);
   }
 
   return bReturn;
@@ -713,7 +779,7 @@ bool CPVRManager::OpenRecordedStream(const CPVRRecording &tag)
   CLog::Log(LOGDEBUG,"PVRManager - %s - opening recorded stream '%s'",
       __FUNCTION__, tag.m_strFile.c_str());
 
-  if ((bReturn = m_addons->OpenRecordedStream(tag)) != false)
+  if ((bReturn = m_addons->OpenStream(tag)) != false)
   {
     delete m_currentFile;
     m_currentFile = new CFileItem(tag);
@@ -724,26 +790,27 @@ bool CPVRManager::OpenRecordedStream(const CPVRRecording &tag)
 
 void CPVRManager::CloseStream(void)
 {
-  CSingleLock lock(m_critSection);
+  CPVRChannelPtr channel;
+  bool bPersistChannel(false);
 
-  if (m_addons->IsReadingLiveStream())
   {
-    CPVRChannel channel;
+    CSingleLock lock(m_critSection);
+
     if (m_addons->GetPlayingChannel(channel))
     {
       /* store current time in iLastWatched */
       time_t tNow;
       CDateTime::GetCurrentDateTime().GetAsTime(tNow);
-      channel.SetLastWatched(tNow, true);
+      channel->SetLastWatched(tNow);
+      bPersistChannel = true;
     }
+
+    m_addons->CloseStream();
+    SAFE_DELETE(m_currentFile);
   }
 
-  m_addons->CloseStream();
-  if (m_currentFile)
-  {
-    delete m_currentFile;
-    m_currentFile = NULL;
-  }
+  if (bPersistChannel)
+    channel->Persist();
 }
 
 void CPVRManager::UpdateCurrentFile(void)
@@ -781,7 +848,11 @@ bool CPVRManager::UpdateItem(CFileItem& item)
     CMusicInfoTag* musictag = item.GetMusicInfoTag();
     if (musictag)
     {
-      musictag->SetTitle(bHasTagNow ? epgTagNow.Title() : g_localizeStrings.Get(19055));
+      musictag->SetTitle(bHasTagNow ?
+          epgTagNow.Title() :
+          g_guiSettings.GetBool("epg.hidenoinfoavailable") ?
+              StringUtils::EmptyString :
+              g_localizeStrings.Get(19055)); // no information available
       if (bHasTagNow)
         musictag->SetGenre(epgTagNow.Genre());
       musictag->SetDuration(bHasTagNow ? epgTagNow.GetDuration() : 3600);
@@ -798,7 +869,11 @@ bool CPVRManager::UpdateItem(CFileItem& item)
     CVideoInfoTag *videotag = item.GetVideoInfoTag();
     if (videotag)
     {
-      videotag->m_strTitle = bHasTagNow ? epgTagNow.Title() : g_localizeStrings.Get(19055);
+      videotag->m_strTitle = bHasTagNow ?
+          epgTagNow.Title() :
+          g_guiSettings.GetBool("epg.hidenoinfoavailable") ?
+              StringUtils::EmptyString :
+              g_localizeStrings.Get(19055); // no information available
       if (bHasTagNow)
         videotag->m_genre = epgTagNow.Genre();
       videotag->m_strPath = channelTag->Path();
@@ -809,24 +884,54 @@ bool CPVRManager::UpdateItem(CFileItem& item)
     }
   }
 
-  CPVRChannel* tagPrev = item.GetPVRChannelInfoTag();
-  if (tagPrev && tagPrev->ChannelNumber() != m_LastChannel)
-  {
-    m_LastChannel         = tagPrev->ChannelNumber();
-    m_LastChannelChanged  = XbmcThreads::SystemClockMillis();
-  }
-  if (XbmcThreads::SystemClockMillis() - m_LastChannelChanged >= (unsigned int) g_guiSettings.GetInt("pvrplayback.channelentrytimeout") && m_LastChannel != m_PreviousChannel[m_PreviousChannelIndex])
-     m_PreviousChannel[m_PreviousChannelIndex ^= 1] = m_LastChannel;
-  else
-    m_LastChannelChanged = XbmcThreads::SystemClockMillis();
-
   return false;
+}
+
+
+bool CPVRManager::UpdateCurrentLastPlayedPosition(int lastplayedposition)
+{
+  // Only anything but recordings we fake success
+  if (!IsPlayingRecording())
+    return true;
+
+  bool rc = false;
+  CPVRRecording currentRecording;
+
+  if (m_addons)
+  {
+    PVR_ERROR error;
+    rc = m_addons->GetPlayingRecording(currentRecording) && m_addons->SetRecordingLastPlayedPosition(currentRecording, lastplayedposition, &error);
+  }
+  return rc;
+}
+
+bool CPVRManager::SetRecordingLastPlayedPosition(const CPVRRecording &recording, int lastplayedposition)
+{
+  bool rc = false;
+
+  if (m_addons)
+  {
+    PVR_ERROR error;
+    rc = m_addons->SetRecordingLastPlayedPosition(recording, lastplayedposition, &error);
+  }
+  return rc;
+}
+
+int CPVRManager::GetRecordingLastPlayedPosition(const CPVRRecording &recording)
+{
+  int rc = 0;
+
+  if (m_addons)
+  {
+    rc = m_addons->GetRecordingLastPlayedPosition(recording);
+  }
+  return rc;
 }
 
 bool CPVRManager::StartPlayback(const CPVRChannel *channel, bool bPreview /* = false */)
 {
   g_settings.m_bStartVideoWindowed = bPreview;
-  g_application.getApplicationMessenger().MediaPlay(CFileItem(*channel));
+  CApplicationMessenger::Get().MediaPlay(CFileItem(*channel));
   CLog::Log(LOGNOTICE, "PVRManager - %s - started playback on channel '%s'",
       __FUNCTION__, channel->ChannelName().c_str());
   return true;
@@ -835,6 +940,9 @@ bool CPVRManager::StartPlayback(const CPVRChannel *channel, bool bPreview /* = f
 bool CPVRManager::PerformChannelSwitch(const CPVRChannel &channel, bool bPreview)
 {
   bool bSwitched(false);
+
+  if (IsParentalLocked(channel))
+    return false;
 
   CSingleLock lock(m_critSection);
   if (m_bIsSwitchingChannels)
@@ -850,13 +958,20 @@ bool CPVRManager::PerformChannelSwitch(const CPVRChannel &channel, bool bPreview
 
   /* make sure that channel settings are persisted */
   if (!bPreview)
-    SaveCurrentChannelSettings();
-
-  if (m_currentFile)
   {
-    delete m_currentFile;
-    m_currentFile = NULL;
+    CPVRChannelPtr currentChannel;
+    if (m_addons->GetPlayingChannel(currentChannel))
+    {
+      /* store current time in iLastWatched */
+      time_t tNow;
+      CDateTime::GetCurrentDateTime().GetAsTime(tNow);
+      currentChannel->SetLastWatched(tNow);
+    }
+
+    SaveCurrentChannelSettings();
   }
+
+  SAFE_DELETE(m_currentFile);
 
   lock.Leave();
 
@@ -886,8 +1001,8 @@ bool CPVRManager::PerformChannelSwitch(const CPVRChannel &channel, bool bPreview
   if (!bSwitched)
   {
     CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Error,
-        g_localizeStrings.Get(19166),
-        g_localizeStrings.Get(19035));
+        g_localizeStrings.Get(19166), // PVR information
+        g_localizeStrings.Get(19035)); // This channel cannot be played. Check the log for details.
   }
 
   return bSwitched;
@@ -920,12 +1035,12 @@ int CPVRManager::TranslateIntInfo(DWORD dwInfo) const
 
 bool CPVRManager::HasTimers(void) const
 {
-  return IsStarted() && m_timers ? m_timers->GetNumTimers() > 0 : false;
+  return IsStarted() && m_timers ? m_timers->HasActiveTimers() : false;
 }
 
 bool CPVRManager::IsRecording(void) const
 {
-  return IsStarted() && m_timers ? m_timers->GetNumActiveRecordings() > 0 : false;
+  return IsStarted() && m_timers ? m_timers->IsRecording() : false;
 }
 
 bool CPVRManager::IsIdle(void) const
@@ -965,8 +1080,8 @@ void CPVRManager::LocalizationChanged(void)
   CSingleLock lock(m_critSection);
   if (IsStarted())
   {
-    m_channelGroups->GetGroupAllRadio()->CheckGroupName();
-    m_channelGroups->GetGroupAllTV()->CheckGroupName();
+    static_cast<CPVRChannelGroupInternal *>(m_channelGroups->GetGroupAllRadio().get())->CheckGroupName();
+    static_cast<CPVRChannelGroupInternal *>(m_channelGroups->GetGroupAllTV().get())->CheckGroupName();
   }
 }
 
@@ -998,17 +1113,6 @@ bool CPVRManager::IsPlayingRecording(void) const
 bool CPVRManager::IsRunningChannelScan(void) const
 {
   return IsStarted() && m_addons && m_addons->IsRunningChannelScan();
-}
-
-PVR_ADDON_CAPABILITIES CPVRManager::GetCurrentAddonCapabilities(void)
-{
-  PVR_ADDON_CAPABILITIES props;
-  memset(&props, 0, sizeof(PVR_ADDON_CAPABILITIES));
-
-  if (IsStarted() && m_addons)
-    props = m_addons->GetCurrentAddonCapabilities();
-
-  return props;
 }
 
 void CPVRManager::StartChannelScan(void)

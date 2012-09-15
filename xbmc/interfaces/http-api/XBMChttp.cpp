@@ -11,6 +11,7 @@
 
 #include "threads/SystemClock.h"
 #include "Application.h"
+#include "ApplicationMessenger.h"
 #include "XBMCConfiguration.h"
 #include "XBMChttp.h"
 //#include "includes.h"
@@ -20,13 +21,13 @@
 #include "Util.h"
 #include "PlayListPlayer.h"
 #include "playlists/PlayList.h"
+#include "filesystem/CurlFile.h" 
 #include "filesystem/HDDirectory.h" 
 #include "filesystem/CDDADirectory.h"
 #include "filesystem/SpecialProtocol.h"
 #include "video/VideoDatabase.h"
 #include "guilib/GUIButtonControl.h"
 #include "GUIInfoManager.h"
-#include "pictures/Picture.h"
 #include "music/tags/MusicInfoTagLoaderFactory.h"
 #include "music/infoscanner/MusicInfoScraper.h"
 #include "addons/AddonManager.h"
@@ -51,8 +52,8 @@
 #include "utils/URIUtils.h"
 #include "utils/log.h"
 #include "TextureCache.h"
-#include "ThumbnailCache.h"
 #include "ThumbLoader.h"
+#include "URL.h"
 
 #ifdef _WIN32
 extern "C" FILE *fopen_utf8(const char *_Filename, const char *_Mode);
@@ -359,12 +360,12 @@ int CXbmcHttp::SetResponse(const CStdString &response)
   if (response.length()>=closeTag.length())
   {
     if ((response.Right(closeTag.length())!=closeTag) && closeFinalTag) 
-      return g_application.getApplicationMessenger().SetResponse(response+closeTag);
+      return CApplicationMessenger::Get().SetResponse(response+closeTag);
   }
   else 
     if (closeFinalTag)
-      return g_application.getApplicationMessenger().SetResponse(response+closeTag);
-  return g_application.getApplicationMessenger().SetResponse(response);
+      return CApplicationMessenger::Get().SetResponse(response+closeTag);
+  return CApplicationMessenger::Get().SetResponse(response);
 }
 
 int CXbmcHttp::displayDir(int numParas, CStdString paras[]) 
@@ -408,7 +409,7 @@ int CXbmcHttp::displayDir(int numParas, CStdString paras[])
     tmp.Format("%i", dirItems.Size());
     return SetResponse(openTag+tmp);
   }
-  dirItems.Sort(SORT_METHOD_LABEL, SORT_ORDER_ASC);
+  dirItems.Sort(SORT_METHOD_LABEL, SortOrderAscending);
   if (lineStart > dirItems.Size() || lineStart < 0)
     return SetResponse(openTag+"Error:Line start value out of range");
   if (numLines == -1)
@@ -469,7 +470,7 @@ void CXbmcHttp::SetCurrentMediaItem(CFileItem& newItem)
   //  If we have tag information, ...
   if (newItem.HasMusicInfoTag() && newItem.GetMusicInfoTag()->Loaded())
   {
-    g_infoManager.SetCurrentSongTag(*newItem.GetMusicInfoTag());
+    CApplicationMessenger::Get().SetCurrentSongTag(*newItem.GetMusicInfoTag());
   }
 }
 
@@ -495,7 +496,7 @@ void CXbmcHttp::AddItemToPlayList(const CFileItemPtr &pItem, int playList, int s
     CStdString strDirectory=pItem->GetPath();
     CFileItemList items;
     CDirectory::GetDirectory(pItem->GetPath(), items, mask);
-    items.Sort(SORT_METHOD_LABEL, SORT_ORDER_ASC);
+    items.Sort(SORT_METHOD_LABEL, SortOrderAscending);
     for (int i=0; i < items.Size(); ++i)
       if (!(CFileItem*)items[i]->m_bIsFolder || recursive)
         AddItemToPlayList(items[i], playList, sortMethod, mask, recursive);
@@ -538,7 +539,7 @@ bool CXbmcHttp::LoadPlayList(CStdString strPath, int iPlaylist, bool clearList, 
   if ((playlist.size() == 1) && (autoStart))
   {
     // just 1 song? then play it (no need to have a playlist of 1 song)
-    g_application.getApplicationMessenger().MediaPlay(playlistItem->GetPath());
+    CApplicationMessenger::Get().MediaPlay(playlistItem->GetPath());
     return true;
   }
 
@@ -552,7 +553,7 @@ bool CXbmcHttp::LoadPlayList(CStdString strPath, int iPlaylist, bool clearList, 
     {
       g_playlistPlayer.SetCurrentPlaylist(iPlaylist);
       g_playlistPlayer.Reset();
-      g_application.getApplicationMessenger().PlayListPlayerPlay();
+      CApplicationMessenger::Get().PlayListPlayerPlay();
       return true;
     } 
     else
@@ -762,7 +763,7 @@ int CXbmcHttp::xbmcGetMediaLocation(int numParas, CStdString paras[])
     tmp.Format("%i",items.Size());
     return SetResponse(openTag+tmp);
   }    
-  items.Sort(SORT_METHOD_LABEL, SORT_ORDER_ASC);
+  items.Sort(SORT_METHOD_LABEL, SortOrderAscending);
   CStdString strLine;
   if (lineStart>items.Size() || lineStart<0)
     return SetResponse(openTag+"Error:Line start value out of range");
@@ -1036,7 +1037,7 @@ int CXbmcHttp::xbmcAddToPlayListFromDB(int numParas, CStdString paras[])
     CMusicDatabase musicdatabase;
     if (!musicdatabase.Open())
       return SetResponse(openTag+ "Error: Could not open music database");
-    musicdatabase.GetSongsByWhere("", where, filelist);
+    musicdatabase.GetSongsByWhere("musicdb://4/", where, filelist);
     musicdatabase.Close();
   }
   else if (type.Equals("movies") || 
@@ -1050,11 +1051,11 @@ int CXbmcHttp::xbmcAddToPlayListFromDB(int numParas, CStdString paras[])
       return SetResponse(openTag+"Error: Could not open video database");
 
     if (type.Equals("movies"))
-      videodatabase.GetMoviesByWhere("", where, filelist);
+      videodatabase.GetMoviesByWhere("videodb://1/2/", where, filelist);
     else if (type.Equals("episodes"))
-      videodatabase.GetEpisodesByWhere("", where, filelist);
+      videodatabase.GetEpisodesByWhere("videodb://2/2/", where, filelist);
     else if (type.Equals("musicvideos"))
-      videodatabase.GetMusicVideosByWhere("", where, filelist);
+      videodatabase.GetMusicVideosByWhere("videodb://3/2/", where, filelist);
     videodatabase.Close();
   }
   else
@@ -1189,7 +1190,7 @@ int CXbmcHttp::xbmcGetTagFromFilename(int numParas, CStdString paras[])
     tag->GetReleaseDate(stTime);
     tmp.Format("%i", stTime.wYear);
     output += closeTag+openTag+"Release year:" + tmp;
-    pItem->SetMusicThumb();
+    CMusicThumbLoader::FillThumb(*pItem);
     if (pItem->HasThumbnail())
       output += closeTag+openTag+"Thumb:" + pItem->GetThumbnailImage() ;
     else {
@@ -1804,15 +1805,7 @@ int CXbmcHttp::xbmcGetThumb(int numParas, CStdString paras[], bool bGetThumb)
 
 int CXbmcHttp::xbmcGetThumbFilename(int numParas, CStdString paras[])
 {
-  CStdString thumbFilename="";
-
-  if (numParas>1)
-  {
-    thumbFilename = CThumbnailCache::GetAlbumThumb(paras[0], paras[1]);
-    return SetResponse(openTag+thumbFilename ) ;
-  }
-  else
-    return SetResponse(openTag+"Error:Missing parameter (album;artist)") ;
+  return SetResponse(openTag+"Error:Deprecated function") ;
 }
 
 int CXbmcHttp::xbmcPlayerPlayFile(int numParas, CStdString paras[])
@@ -1834,7 +1827,7 @@ int CXbmcHttp::xbmcPlayerPlayFile(int numParas, CStdString paras[])
   }
   else
   {
-    g_application.getApplicationMessenger().MediaPlay(paras[0]);
+    CApplicationMessenger::Get().MediaPlay(paras[0]);
     if(g_application.IsPlaying())
       return SetResponse(openTag+"OK");
   }
@@ -2117,7 +2110,7 @@ int CXbmcHttp::xbmcAction(int numParas, CStdString paras[], int theAction)
         pSlideShow->OnAction(CAction(ACTION_PAUSE));
     }
     else
-      g_application.getApplicationMessenger().MediaPause();
+      CApplicationMessenger::Get().MediaPause();
     return SetResponse(openTag+"OK");
     break;
   case 2:
@@ -2128,7 +2121,7 @@ int CXbmcHttp::xbmcAction(int numParas, CStdString paras[], int theAction)
         pSlideShow->OnAction(CAction(ACTION_STOP));
     }
     else
-      g_application.getApplicationMessenger().MediaStop();
+      CApplicationMessenger::Get().MediaStop();
     return SetResponse(openTag+"OK");
     break;
   case 3:
@@ -2158,7 +2151,7 @@ int CXbmcHttp::xbmcAction(int numParas, CStdString paras[], int theAction)
     {
       CGUIWindowSlideShow *pSlideShow = (CGUIWindowSlideShow *)g_windowManager.GetWindow(WINDOW_SLIDESHOW);
       if (pSlideShow) {
-        pSlideShow->OnAction(CAction(ACTION_ROTATE_PICTURE));
+        pSlideShow->OnAction(CAction(ACTION_ROTATE_PICTURE_CW));
         return SetResponse(openTag+"OK");
       }
       else
@@ -2401,7 +2394,7 @@ int CXbmcHttp::xbmcSetFile(int numParas, CStdString paras[])
 
 int CXbmcHttp::xbmcCopyFile(int numParas, CStdString paras[])
 //parameter = srcFilename ; destFilename
-// both file names are relative to the XBox not the calling client
+// both file names are relative to the server, not the calling client
 {
   if (numParas<2)
     return SetResponse(openTag+"Error:Missing parameter");
@@ -2489,7 +2482,7 @@ int CXbmcHttp::xbmcShowPicture(int numParas, CStdString paras[])
   {
     if (!playableFile(paras[0]))
       return SetResponse(openTag+"Error:Unable to open file");
-    g_application.getApplicationMessenger().PictureShow(paras[0]);
+    CApplicationMessenger::Get().PictureShow(paras[0]);
     return SetResponse(openTag+"OK");
   }
 }
@@ -2514,7 +2507,7 @@ int CXbmcHttp::xbmcExecBuiltIn(int numParas, CStdString paras[])
     return SetResponse(openTag+"Error:Missing parameter");
   else
   {
-    g_application.getApplicationMessenger().ExecBuiltIn(paras[0]);
+    CApplicationMessenger::Get().ExecBuiltIn(paras[0]);
     return SetResponse(openTag+"OK");
   }
 }
@@ -2868,77 +2861,7 @@ int CXbmcHttp::xbmcTakeScreenshot(int numParas, CStdString paras[])
   if (numParas<1)
     CUtil::TakeScreenshot();
   else
-  {
-    CStdString filepath;
-    if (paras[0]=="")
-      filepath = "special://temp/screenshot.jpg";
-    else
-      filepath = paras[0];
-    if (numParas>5)
-    {
-      CStdString tmpFile = "special://temp/temp.png";
-      CUtil::TakeScreenshot(tmpFile, true);
-      int height, width;
-      if (paras[4]=="")
-        if (paras[3]=="")
-        {
-          return SetResponse(openTag+"Error:Both height and width parameters cannot be absent");
-        }
-        else
-        {
-          width=atoi(paras[3]);
-          height=-1;
-        }
-      else
-        if (paras[3]=="")
-        {
-          height=atoi(paras[4]);
-          width=-1;
-        }
-        else
-        {
-          width=atoi(paras[3]);
-          height=atoi(paras[4]);
-        }
-      int ret = CPicture::ConvertFile(tmpFile, filepath, (float) atof(paras[2]), width, height, atoi(paras[5]));
-      if (ret == 0)
-      {
-        CFile::Delete(tmpFile);
-        if (numParas>6)
-          if (paras[6].ToLower()=="true")
-          {
-            CStdString b64="";
-            int linesize=80;
-            bool bImgTag=false;
-            // only allow the old GetThumb command to accept "imgtag"
-            if (numParas==8 && paras[7].Equals("imgtag"))
-            {
-              bImgTag=true;
-              b64="<img src=\"data:image/jpg;base64,";
-              linesize=0;
-            }
-            b64+=encodeFileToBase64(filepath,linesize);
-            if (filepath == "special://temp/screenshot.jpg")
-              CFile::Delete(filepath);
-            if (bImgTag)
-            {
-              b64+="\" alt=\"Your browser doesnt support this\" title=\"";
-              b64+=paras[0];
-              b64+="\">";
-            }
-            return SetResponse(b64) ;
-          }
-      }
-      else
-      {
-        CStdString strInt;
-        strInt.Format("%", ret);
-        return SetResponse(openTag+"Error:Could not convert image, error: " + strInt );
-      }
-    }
-    else
-      return SetResponse(openTag+"Error:Missing parameters");
-  }
+    return SetResponse(openTag+"Error: xbmcTakeScreenshot with params depracated");
   return SetResponse(openTag+"OK");
 }
 
@@ -3079,8 +3002,8 @@ int CXbmcHttp::xbmcHelp()
 {
   CStdString output;
   output="<p><b>XBMC HTTP API Commands</b></p><p>There are two alternative but equivalent syntax forms:</p>";
-  output+="<p><b>Syntax 1: http://xbox/xbmcCmds/xbmcHttp?command=</b>command<b>&ampparameter=</b>first_parameter<b>;</b>second_parameter<b>;...</b></p>";
-  output+="<p><b>Syntax 2: http://xbox/xbmcCmds/xbmcHttp?command=</b>command<b>(</b>first_parameter<b>;</b>second_parameter<b>;...</b><b>)</b></p>";
+  output+="<p><b>Syntax 1: http://xbmc-host/xbmcCmds/xbmcHttp?command=</b>command<b>&ampparameter=</b>first_parameter<b>;</b>second_parameter<b>;...</b></p>";
+  output+="<p><b>Syntax 2: http://xbmc-host/xbmcCmds/xbmcHttp?command=</b>command<b>(</b>first_parameter<b>;</b>second_parameter<b>;...</b><b>)</b></p>";
   output+="<p>Note the use of the semi colon to separate multiple parameters.</p><p>The commands are case insensitive.</p>";
   output+= "<p>The full documentation can be found here: <a  href=\"http://wiki.xbmc.org/index.php?title=WebServerHTTP-API\">http://wiki.xbmc.org/index.php?title=WebServerHTTP-API</a></p>";
   return SetResponse(output);

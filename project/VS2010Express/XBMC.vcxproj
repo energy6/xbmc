@@ -73,15 +73,12 @@
     <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Release (OpenGL)|Win32'">XBMC\$(Configuration)\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Release (OpenGL)|Win32'">XBMC\$(Configuration)\objs\</IntDir>
-    <IgnoreImportLibrary Condition="'$(Configuration)|$(Platform)'=='Release (OpenGL)|Win32'">false</IgnoreImportLibrary>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release (OpenGL)|Win32'">false</LinkIncremental>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug (DirectX)|Win32'">XBMC\$(Configuration)\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug (DirectX)|Win32'">XBMC\$(Configuration)\objs\</IntDir>
-    <IgnoreImportLibrary Condition="'$(Configuration)|$(Platform)'=='Debug (DirectX)|Win32'">false</IgnoreImportLibrary>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug (DirectX)|Win32'">true</LinkIncremental>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Release (DirectX)|Win32'">XBMC\$(Configuration)\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Release (DirectX)|Win32'">XBMC\$(Configuration)\objs\</IntDir>
-    <IgnoreImportLibrary Condition="'$(Configuration)|$(Platform)'=='Release (DirectX)|Win32'">false</IgnoreImportLibrary>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release (DirectX)|Win32'">false</LinkIncremental>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug (OpenGL)|Win32'">XBMC\$(Configuration)\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug (OpenGL)|Win32'">XBMC\$(Configuration)\objs\</IntDir>
@@ -102,13 +99,13 @@
       <InlineFunctionExpansion>Default</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <OmitFramePointers>true</OmitFramePointers>
-      <AdditionalIncludeDirectories>..\..\;..\..\xbmc\;..\..\xbmc\win32\;..\..\xbmc\cores\dvdplayer;..\..\lib;..\..\lib\ffmpeg;..\..\lib\ffmpeg\include-xbmc-win32;..\..\lib\liblame\include;..\..\lib\libUPnP\Platinum\Source\Devices\MediaRenderer;..\..\lib\libUPnP\Platinum\Source\Devices\MediaConnect;..\..\lib\libUPnP\Platinum\Source\Devices\MediaServer;..\..\lib\libUPnP\Platinum\Source\Platinum;..\..\lib\libUPnP\Platinum\Source\Core;..\..\lib\libUPnP\Neptune\Source\Core;..\..\lib\libUPnP\Neptune\Source\System\Win32;..\..\lib\win32\pcre;..\..\lib\win32</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\;..\..\xbmc\;..\..\xbmc\cores\dvdplayer;..\..\xbmc\win32;..\..\lib;..\..\lib\ffmpeg;..\..\lib\ffmpeg\include-xbmc-win32;..\..\lib\liblame\include;..\..\lib\libUPnP\Platinum\Source\Devices\MediaRenderer;..\..\lib\libUPnP\Platinum\Source\Devices\MediaConnect;..\..\lib\libUPnP\Platinum\Source\Devices\MediaServer;..\..\lib\libUPnP\Platinum\Source\Platinum;..\..\lib\libUPnP\Platinum\Source\Core;..\..\lib\libUPnP\Neptune\Source\Core;..\..\lib\libUPnP\Neptune\Source\System\Win32;..\..\lib\win32\pcre;..\..\lib\win32;..\..\xbmc\cores\AudioEngine\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>TARGET_WINDOWS;_WINDOWS;_MSVC;WIN32;NDEBUG;_WIN32_WINNT=0x0501;NTDDI_VERSION=0x05010300;NOMINMAX;_USE_32BIT_TIME_T;HAS_GL;__STDC_CONSTANT_MACROS;XMD_H;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>false</StringPooling>
       <MinimalRebuild>false</MinimalRebuild>
       <ExceptionHandling>Async</ExceptionHandling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions</EnableEnhancedInstructionSet>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -123,9 +120,8 @@
     </ClCompile>
     <Link>
       <AdditionalOptions>/MACHINE:I386 /IGNORE:4089 /ignore:4254 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>SDL.lib;opengl32.lib;DSound.lib;glew32.lib;glu32.lib;winmm.lib;ws2_32.lib;Mpr.lib;Iphlpapi.lib;PowrProf.lib;setupapi.lib;dwmapi.lib;yajl.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>DInput8.lib;DSound.lib;winmm.lib;Mpr.lib;Iphlpapi.lib;PowrProf.lib;setupapi.lib;dwmapi.lib;yajl.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)XBMC.exe</OutputFile>
-      <AdditionalLibraryDirectories>..\..\lib\libSDL-WIN32\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>libc;msvcrt;libci;msvcprt;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <DelayLoadDLLs>dnssd.dll;dwmapi.dll;libmicrohttpd-5.dll;ssh.dll;sqlite3.dll;libsamplerate-0.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -134,10 +130,10 @@
       <LargeAddressAware>true</LargeAddressAware>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <RandomizedBaseAddress>false</RandomizedBaseAddress>
-      <DataExecutionPrevention>
-      </DataExecutionPrevention>
+      <RandomizedBaseAddress>true</RandomizedBaseAddress>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
       <TargetMachine>MachineX86</TargetMachine>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <Manifest>
       <AdditionalManifestFiles>VC90.CRT.x86.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
@@ -147,7 +143,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug (DirectX)|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\;..\..\xbmc\;..\..\xbmc\cores\dvdplayer;..\..\xbmc\win32;..\..\lib;..\..\lib\ffmpeg;..\..\lib\ffmpeg\include-xbmc-win32;..\..\lib\liblame\include;..\..\lib\libUPnP\Platinum\Source\Devices\MediaRenderer;..\..\lib\libUPnP\Platinum\Source\Devices\MediaConnect;..\..\lib\libUPnP\Platinum\Source\Devices\MediaServer;..\..\lib\libUPnP\Platinum\Source\Platinum;..\..\lib\libUPnP\Platinum\Source\Core;..\..\lib\libUPnP\Neptune\Source\Core;..\..\lib\libUPnP\Neptune\Source\System\Win32;..\..\lib\win32\pcre;..\..\lib\win32;..\..\xbmc\cores\AudioEngine\;..\..\xbmc\cores\AudioEngine\Utils\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\;..\..\xbmc\;..\..\xbmc\cores\dvdplayer;..\..\xbmc\win32;..\..\lib;..\..\lib\ffmpeg;..\..\lib\ffmpeg\include-xbmc-win32;..\..\lib\liblame\include;..\..\lib\libUPnP\Platinum\Source\Devices\MediaRenderer;..\..\lib\libUPnP\Platinum\Source\Devices\MediaConnect;..\..\lib\libUPnP\Platinum\Source\Devices\MediaServer;..\..\lib\libUPnP\Platinum\Source\Platinum;..\..\lib\libUPnP\Platinum\Source\Core;..\..\lib\libUPnP\Neptune\Source\Core;..\..\lib\libUPnP\Neptune\Source\System\Win32;..\..\lib\win32\pcre;..\..\lib\win32;..\..\xbmc\cores\AudioEngine\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>TARGET_WINDOWS;_WINDOWS;_MSVC;WIN32;_DEBUG;_WIN32_WINNT=0x0501;NTDDI_VERSION=0x05010300;NOMINMAX;_USE_32BIT_TIME_T;HAS_DX;D3D_DEBUG_INFO;__STDC_CONSTANT_MACROS;_SECURE_SCL=0;_HAS_ITERATOR_DEBUGGING=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <ExceptionHandling>Async</ExceptionHandling>
@@ -162,12 +158,12 @@
       <ForcedIncludeFiles>pch.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <ShowIncludes>false</ShowIncludes>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <EnableEnhancedInstructionSet>StreamingSIMDExtensions</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <AdditionalOptions>/MACHINE:I386 /IGNORE:4089 /ignore:4254 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>SDL.lib;D3D9.lib;D3dx9.lib;DInput8.lib;DSound.lib;winmm.lib;ws2_32.lib;Mpr.lib;Iphlpapi.lib;PowrProf.lib;setupapi.lib;dwmapi.lib;strmiids.lib;dxguid.lib;mfuuid.lib;comctl32.lib;yajl.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>D3dx9.lib;DInput8.lib;DSound.lib;winmm.lib;Mpr.lib;Iphlpapi.lib;PowrProf.lib;setupapi.lib;dwmapi.lib;yajl.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)XBMC.exe</OutputFile>
-      <AdditionalLibraryDirectories>..\..\lib\libSDL-WIN32\lib;..\..\xbmc\cores\DSPlayer\Libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>libc;msvcrt;libcmt;msvcrtd;msvcprtd;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ModuleDefinitionFile>
       </ModuleDefinitionFile>
@@ -194,7 +190,7 @@
       <InlineFunctionExpansion>Default</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <OmitFramePointers>true</OmitFramePointers>
-      <AdditionalIncludeDirectories>..\..\;..\..\xbmc\;..\..\xbmc\win32\;..\..\xbmc\cores\dvdplayer;..\..\lib;..\..\lib\ffmpeg;..\..\lib\ffmpeg\include-xbmc-win32;..\..\lib\liblame\include;..\..\lib\libUPnP\Platinum\Source\Devices\MediaRenderer;..\..\lib\libUPnP\Platinum\Source\Devices\MediaConnect;..\..\lib\libUPnP\Platinum\Source\Devices\MediaServer;..\..\lib\libUPnP\Platinum\Source\Platinum;..\..\lib\libUPnP\Platinum\Source\Core;..\..\lib\libUPnP\Neptune\Source\Core;..\..\lib\libUPnP\Neptune\Source\System\Win32;..\..\lib\win32\pcre;..\..\lib\win32;..\..\xbmc\cores\AudioEngine</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\;..\..\xbmc\;..\..\xbmc\cores\dvdplayer;..\..\xbmc\win32;..\..\lib;..\..\lib\ffmpeg;..\..\lib\ffmpeg\include-xbmc-win32;..\..\lib\liblame\include;..\..\lib\libUPnP\Platinum\Source\Devices\MediaRenderer;..\..\lib\libUPnP\Platinum\Source\Devices\MediaConnect;..\..\lib\libUPnP\Platinum\Source\Devices\MediaServer;..\..\lib\libUPnP\Platinum\Source\Platinum;..\..\lib\libUPnP\Platinum\Source\Core;..\..\lib\libUPnP\Neptune\Source\Core;..\..\lib\libUPnP\Neptune\Source\System\Win32;..\..\lib\win32\pcre;..\..\lib\win32;..\..\xbmc\cores\AudioEngine\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>TARGET_WINDOWS;_WINDOWS;_MSVC;WIN32;NDEBUG;_WIN32_WINNT=0x0501;NTDDI_VERSION=0x05010300;NOMINMAX;_USE_32BIT_TIME_T;HAS_DX;__STDC_CONSTANT_MACROS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>false</StringPooling>
       <MinimalRebuild>false</MinimalRebuild>
@@ -214,9 +210,8 @@
     </ClCompile>
     <Link>
       <AdditionalOptions>/MACHINE:I386 /IGNORE:4089 /ignore:4254 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>SDL.lib;D3D9.lib;D3dx9.lib;DInput8.lib;DSound.lib;winmm.lib;ws2_32.lib;Mpr.lib;Iphlpapi.lib;PowrProf.lib;setupapi.lib;dwmapi.lib;strmiids.lib;mfuuid.lib;comctl32.lib;yajl.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>D3dx9.lib;DInput8.lib;DSound.lib;winmm.lib;Mpr.lib;Iphlpapi.lib;PowrProf.lib;setupapi.lib;dwmapi.lib;yajl.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)XBMC.exe</OutputFile>
-      <AdditionalLibraryDirectories>..\..\lib\libSDL-WIN32\lib;..\..\xbmc\cores\DSPlayer\Libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>libc;msvcrt;libci;msvcprt;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <DelayLoadDLLs>dnssd.dll;dwmapi.dll;libmicrohttpd-5.dll;ssh.dll;sqlite3.dll;libsamplerate-0.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -238,7 +233,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug (OpenGL)|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\;..\..\xbmc\;..\..\xbmc\win32\;..\..\xbmc\cores\dvdplayer;..\..\lib;..\..\lib\ffmpeg;..\..\lib\ffmpeg\include-xbmc-win32;..\..\lib\liblame\include;..\..\lib\libUPnP\Platinum\Source\Devices\MediaRenderer;..\..\lib\libUPnP\Platinum\Source\Devices\MediaConnect;..\..\lib\libUPnP\Platinum\Source\Devices\MediaServer;..\..\lib\libUPnP\Platinum\Source\Platinum;..\..\lib\libUPnP\Platinum\Source\Core;..\..\lib\libUPnP\Neptune\Source\Core;..\..\lib\libUPnP\Neptune\Source\System\Win32;..\..\lib\win32\pcre;..\..\lib\win32</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\;..\..\xbmc\;..\..\xbmc\cores\dvdplayer;..\..\xbmc\win32;..\..\lib;..\..\lib\ffmpeg;..\..\lib\ffmpeg\include-xbmc-win32;..\..\lib\liblame\include;..\..\lib\libUPnP\Platinum\Source\Devices\MediaRenderer;..\..\lib\libUPnP\Platinum\Source\Devices\MediaConnect;..\..\lib\libUPnP\Platinum\Source\Devices\MediaServer;..\..\lib\libUPnP\Platinum\Source\Platinum;..\..\lib\libUPnP\Platinum\Source\Core;..\..\lib\libUPnP\Neptune\Source\Core;..\..\lib\libUPnP\Neptune\Source\System\Win32;..\..\lib\win32\pcre;..\..\lib\win32;..\..\xbmc\cores\AudioEngine\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>TARGET_WINDOWS;_WINDOWS;_MSVC;WIN32;_DEBUG;_WIN32_WINNT=0x0501;NTDDI_VERSION=0x05010300;NOMINMAX;_USE_32BIT_TIME_T;HAS_GL;__STDC_CONSTANT_MACROS;_SECURE_SCL=0;_HAS_ITERATOR_DEBUGGING=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <ExceptionHandling>Async</ExceptionHandling>
@@ -246,7 +241,6 @@
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <ProgramDataBaseFileName>$(IntDir)XBMC.pdb</ProgramDataBaseFileName>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <DisableSpecificWarnings>4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
@@ -256,9 +250,8 @@
     </ClCompile>
     <Link>
       <AdditionalOptions>/MACHINE:I386 /IGNORE:4089 /ignore:4254 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>SDL.lib;D3D9.lib;DInput8.lib;DSound.lib;winmm.lib;ws2_32.lib;Mpr.lib;Iphlpapi.lib;PowrProf.lib;setupapi.lib;dwmapi.lib;yajl.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>DInput8.lib;DSound.lib;winmm.lib;Mpr.lib;Iphlpapi.lib;PowrProf.lib;setupapi.lib;dwmapi.lib;yajl.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)XBMC.exe</OutputFile>
-      <AdditionalLibraryDirectories>..\..\lib\libSDL-WIN32\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>libc;msvcrt;libcmt;msvcrtd;msvcprtd;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ModuleDefinitionFile>
       </ModuleDefinitionFile>
@@ -269,15 +262,19 @@
       <LargeAddressAware>true</LargeAddressAware>
       <EntryPointSymbol>
       </EntryPointSymbol>
-      <RandomizedBaseAddress>false</RandomizedBaseAddress>
-      <DataExecutionPrevention>
-      </DataExecutionPrevention>
+      <RandomizedBaseAddress>true</RandomizedBaseAddress>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
     <Manifest>
       <AdditionalManifestFiles>VC90.CRT.x86.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
       <EnableDPIAwareness>true</EnableDPIAwareness>
     </Manifest>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Template|Win32'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>..\..\;..\..\xbmc\;..\..\xbmc\cores\dvdplayer;..\..\xbmc\win32;..\..\lib;..\..\lib\ffmpeg;..\..\lib\ffmpeg\include-xbmc-win32;..\..\lib\liblame\include;..\..\lib\libUPnP\Platinum\Source\Devices\MediaRenderer;..\..\lib\libUPnP\Platinum\Source\Devices\MediaConnect;..\..\lib\libUPnP\Platinum\Source\Devices\MediaServer;..\..\lib\libUPnP\Platinum\Source\Platinum;..\..\lib\libUPnP\Platinum\Source\Core;..\..\lib\libUPnP\Neptune\Source\Core;..\..\lib\libUPnP\Neptune\Source\System\Win32;..\..\lib\win32\pcre;..\..\lib\win32;..\..\xbmc\cores\AudioEngine\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\lib\SlingboxLib\SlingboxLib.cpp" />
@@ -331,6 +328,7 @@
     <ClCompile Include="..\..\xbmc\cores\VideoRenderers\RenderCapture.cpp" />
     <ClCompile Include="..\..\xbmc\cores\VideoRenderers\VideoShaders\WinVideoFilter.cpp" />
     <ClCompile Include="..\..\xbmc\CueDocument.cpp" />
+    <ClCompile Include="..\..\xbmc\DbUrl.cpp" />
     <ClCompile Include="..\..\xbmc\dbwrappers\Database.cpp" />
     <ClCompile Include="..\..\xbmc\dbwrappers\dataset.cpp" />
     <ClCompile Include="..\..\xbmc\dbwrappers\mysqldataset.cpp" />
@@ -346,7 +344,7 @@
     <ClCompile Include="..\..\xbmc\dialogs\GUIDialogFileBrowser.cpp" />
     <ClCompile Include="..\..\xbmc\dialogs\GUIDialogGamepad.cpp" />
     <ClCompile Include="..\..\xbmc\dialogs\GUIDialogKaiToast.cpp" />
-    <ClCompile Include="..\..\xbmc\dialogs\GUIDialogKeyboard.cpp" />
+    <ClCompile Include="..\..\xbmc\dialogs\GUIDialogKeyboardGeneric.cpp" />
     <ClCompile Include="..\..\xbmc\dialogs\GUIDialogMediaSource.cpp" />
     <ClCompile Include="..\..\xbmc\dialogs\GUIDialogMuteBug.cpp" />
     <ClCompile Include="..\..\xbmc\dialogs\GUIDialogNumeric.cpp" />
@@ -464,6 +462,7 @@
     <ClCompile Include="..\..\xbmc\filesystem\UPnPFile.cpp" />
     <ClCompile Include="..\..\xbmc\filesystem\VideoDatabaseDirectory.cpp" />
     <ClCompile Include="..\..\xbmc\FileSystem\VideoDatabaseDirectory\DirectoryNodeCountry.cpp" />
+    <ClCompile Include="..\..\xbmc\filesystem\VideoDatabaseDirectory\DirectoryNodeTags.cpp" />
     <ClCompile Include="..\..\xbmc\filesystem\windows\WINFileSMB.cpp" />
     <ClCompile Include="..\..\xbmc\filesystem\windows\WINSMBDirectory.cpp" />
     <ClCompile Include="..\..\xbmc\filesystem\VirtualDirectory.cpp" />
@@ -514,6 +513,7 @@
     <ClCompile Include="..\..\xbmc\guilib\GUIImage.cpp" />
     <ClCompile Include="..\..\xbmc\guilib\GUIIncludes.cpp" />
     <ClCompile Include="..\..\xbmc\guilib\GUIInfoTypes.cpp" />
+    <ClCompile Include="..\..\xbmc\guilib\GUIKeyboardFactory.cpp" />
     <ClCompile Include="..\..\xbmc\guilib\GUILabel.cpp" />
     <ClCompile Include="..\..\xbmc\guilib\GUILabelControl.cpp" />
     <ClCompile Include="..\..\xbmc\guilib\GUIListContainer.cpp" />
@@ -588,9 +588,9 @@
     <ClCompile Include="..\..\xbmc\input\KeyboardLayoutConfiguration.cpp" />
     <ClCompile Include="..\..\xbmc\input\KeyboardStat.cpp" />
     <ClCompile Include="..\..\xbmc\input\MouseStat.cpp" />
-    <ClCompile Include="..\..\xbmc\input\SDLJoystick.cpp" />
     <ClCompile Include="..\..\xbmc\input\windows\IRServerSuite.cpp" />
     <ClCompile Include="..\..\xbmc\input\windows\IrssMessage.cpp" />
+    <ClCompile Include="..\..\xbmc\input\windows\WINJoystick.cpp" />
     <ClCompile Include="..\..\xbmc\input\XBMC_keytable.cpp" />
     <ClCompile Include="..\..\xbmc\interfaces\AnnouncementManager.cpp" />
     <ClCompile Include="..\..\xbmc\interfaces\Builtins.cpp" />
@@ -764,6 +764,7 @@
     <ClCompile Include="..\..\xbmc\music\karaoke\karaokewindowbackground.cpp" />
     <ClCompile Include="..\..\xbmc\music\LastFmManager.cpp" />
     <ClCompile Include="..\..\xbmc\music\MusicDatabase.cpp" />
+    <ClCompile Include="..\..\xbmc\music\MusicDbUrl.cpp" />
     <ClCompile Include="..\..\xbmc\music\MusicInfoLoader.cpp" />
     <ClCompile Include="..\..\xbmc\music\Song.cpp" />
     <ClCompile Include="..\..\xbmc\music\tags\APEv2Tag.cpp" />
@@ -799,6 +800,7 @@
     <ClCompile Include="..\..\xbmc\music\windows\GUIWindowMusicSongs.cpp" />
     <ClCompile Include="..\..\xbmc\music\windows\GUIWindowVisualisation.cpp" />
     <ClCompile Include="..\..\xbmc\network\AirPlayServer.cpp" />
+    <ClCompile Include="..\..\xbmc\network\AirTunesServer.cpp" />
     <ClCompile Include="..\..\xbmc\network\cddb.cpp" />
     <ClCompile Include="..\..\xbmc\network\DNSNameCache.cpp" />
     <ClCompile Include="..\..\xbmc\network\EventClient.cpp" />
@@ -871,8 +873,6 @@
     <ClCompile Include="..\..\xbmc\powermanagement\windows\Win32PowerSyscall.cpp" />
     <ClCompile Include="..\..\xbmc\programs\GUIViewStatePrograms.cpp" />
     <ClCompile Include="..\..\xbmc\programs\GUIWindowPrograms.cpp" />
-    <ClCompile Include="..\..\xbmc\programs\ProgramDatabase.cpp" />
-    <ClCompile Include="..\..\xbmc\programs\Shortcut.cpp" />
     <ClCompile Include="..\..\xbmc\pvr\addons\PVRClient.cpp" />
     <ClCompile Include="..\..\xbmc\pvr\addons\PVRClients.cpp" />
     <ClCompile Include="..\..\xbmc\pvr\channels\PVRChannel.cpp" />
@@ -933,7 +933,6 @@
     <ClCompile Include="..\..\xbmc\settings\Settings.cpp" />
     <ClCompile Include="..\..\xbmc\settings\SettingsControls.cpp" />
     <ClCompile Include="..\..\xbmc\settings\VideoSettings.cpp" />
-    <ClCompile Include="..\..\xbmc\SortFileItem.cpp" />
     <ClCompile Include="..\..\xbmc\storage\AutorunMediaJob.cpp" />
     <ClCompile Include="..\..\xbmc\storage\cdioSupport.cpp" />
     <ClCompile Include="..\..\xbmc\storage\IoSupport.cpp" />
@@ -944,6 +943,7 @@
     <ClCompile Include="..\..\xbmc\TextureCache.cpp" />
     <ClCompile Include="..\..\xbmc\TextureCacheJob.cpp" />
     <ClCompile Include="..\..\xbmc\TextureDatabase.cpp" />
+    <ClCompile Include="..\..\xbmc\DatabaseManager.cpp" />
     <ClInclude Include="..\..\xbmc\cores\AudioEngine\AEAudioFormat.h" />
     <ClInclude Include="..\..\xbmc\cores\AudioEngine\AEFactory.h" />
     <ClInclude Include="..\..\xbmc\cores\AudioEngine\AESinkFactory.h" />
@@ -973,12 +973,21 @@
     <ClInclude Include="..\..\xbmc\cores\AudioEngine\Utils\AEWAVLoader.h" />
     <ClInclude Include="..\..\xbmc\cores\dvdplayer\DVDCodecs\Audio\DVDAudioCodecPassthrough.h" />
     <ClInclude Include="..\..\xbmc\cores\paplayer\PCMCodec.h" />
+    <ClInclude Include="..\..\xbmc\dialogs\GUIDialogKeyboardGeneric.h" />
+    <ClInclude Include="..\..\xbmc\DbUrl.h" />
     <ClInclude Include="..\..\xbmc\filesystem\ImageFile.h" />
+    <ClInclude Include="..\..\xbmc\filesystem\VideoDatabaseDirectory\DirectoryNodeTags.h" />
     <ClInclude Include="..\..\xbmc\filesystem\windows\WINFileSMB.h" />
     <ClInclude Include="..\..\xbmc\filesystem\windows\WINSMBDirectory.h" />
     <ClInclude Include="..\..\xbmc\interfaces\json-rpc\PVROperations.h" />
+    <ClInclude Include="..\..\xbmc\guilib\GUIKeyboard.h" />
+    <ClInclude Include="..\..\xbmc\guilib\GUIKeyboardFactory.h" />
+    <ClInclude Include="..\..\xbmc\input\windows\WINJoystick.h" />
     <ClInclude Include="..\..\xbmc\interfaces\python\xbmcmodule\pythreadstate.h" />
+    <ClInclude Include="..\..\xbmc\music\MusicDbUrl.h" />
     <ClInclude Include="..\..\xbmc\network\httprequesthandler\HTTPImageHandler.h" />
+    <ClInclude Include="..\..\xbmc\network\AirTunesServer.h" />
+    <ClInclude Include="..\..\xbmc\network\DllLibShairplay.h" />
     <ClInclude Include="..\..\xbmc\network\websocket\WebSocket.h" />
     <ClInclude Include="..\..\xbmc\network\websocket\WebSocketManager.h" />
     <ClInclude Include="..\..\xbmc\network\websocket\WebSocketV13.h" />
@@ -1011,8 +1020,6 @@
     <ClInclude Include="..\..\xbmc\filesystem\Directory.h" />
     <ClInclude Include="..\..\xbmc\filesystem\DirectoryFactory.h" />
     <ClInclude Include="..\..\xbmc\filesystem\DirectoryHistory.h" />
-    <ClInclude Include="..\..\xbmc\filesystem\DllHDHomeRunDirectory.h" />
-    <ClInclude Include="..\..\xbmc\filesystem\DllHDHomeRunFile.h" />
     <ClInclude Include="..\..\xbmc\filesystem\DllLibAfp.h" />
     <ClInclude Include="..\..\xbmc\filesystem\DllLibCMyth.h" />
     <ClInclude Include="..\..\xbmc\filesystem\DllLibCurl.h" />
@@ -1099,7 +1106,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug (DirectX)|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release (DirectX)|Win32'">true</ExcludedFromBuild>
     </ClInclude>
-    <ClInclude Include="..\..\xbmc\filesystem\FileUPnP.h" />
     <ClCompile Include="..\..\xbmc\ThumbLoader.cpp" />
     <ClCompile Include="..\..\xbmc\ThumbnailCache.cpp" />
     <ClCompile Include="..\..\xbmc\URL.cpp" />
@@ -1114,8 +1120,10 @@
     <ClCompile Include="..\..\xbmc\utils\CharsetConverter.cpp" />
     <ClCompile Include="..\..\xbmc\utils\CPUInfo.cpp" />
     <ClCompile Include="..\..\xbmc\utils\Crc32.cpp" />
+    <ClCompile Include="..\..\xbmc\utils\DatabaseUtils.cpp" />
     <ClCompile Include="..\..\xbmc\utils\DownloadQueue.cpp" />
     <ClCompile Include="..\..\xbmc\utils\DownloadQueueManager.cpp" />
+    <ClCompile Include="..\..\xbmc\utils\EndianSwap.cpp" />
     <ClCompile Include="..\..\xbmc\utils\Fanart.cpp" />
     <ClCompile Include="..\..\xbmc\utils\fft.cpp" />
     <ClCompile Include="..\..\xbmc\utils\FileOperationJob.cpp" />
@@ -1156,8 +1164,9 @@
     <ClCompile Include="..\..\xbmc\utils\RssReader.cpp" />
     <ClCompile Include="..\..\xbmc\utils\ScraperParser.cpp" />
     <ClCompile Include="..\..\xbmc\utils\ScraperUrl.cpp" />
+    <ClCompile Include="..\..\xbmc\utils\SeekHandler.cpp" />
+    <ClCompile Include="..\..\xbmc\utils\SortUtils.cpp" />
     <ClCompile Include="..\..\xbmc\utils\Splash.cpp" />
-    <ClCompile Include="..\..\xbmc\utils\ssrc.cpp" />
     <ClCompile Include="..\..\xbmc\utils\Stopwatch.cpp" />
     <ClCompile Include="..\..\xbmc\utils\StreamDetails.cpp" />
     <ClCompile Include="..\..\xbmc\utils\StreamUtils.cpp" />
@@ -1168,9 +1177,9 @@
     <ClCompile Include="..\..\xbmc\utils\TimeUtils.cpp" />
     <ClCompile Include="..\..\xbmc\utils\TuxBoxUtil.cpp" />
     <ClCompile Include="..\..\xbmc\utils\URIUtils.cpp" />
+    <ClCompile Include="..\..\xbmc\utils\UrlOptions.cpp" />
     <ClCompile Include="..\..\xbmc\utils\Variant.cpp" />
     <ClCompile Include="..\..\xbmc\utils\Weather.cpp" />
-    <ClCompile Include="..\..\xbmc\utils\Win32Exception.cpp" />
     <ClCompile Include="..\..\xbmc\utils\XBMCTinyXML.cpp" />
     <ClCompile Include="..\..\xbmc\utils\XMLUtils.cpp" />
     <ClCompile Include="..\..\xbmc\video\Bookmark.cpp" />
@@ -1187,6 +1196,7 @@
     <ClCompile Include="..\..\xbmc\video\GUIViewStateVideo.cpp" />
     <ClCompile Include="..\..\xbmc\video\Teletext.cpp" />
     <ClCompile Include="..\..\xbmc\video\VideoDatabase.cpp" />
+    <ClCompile Include="..\..\xbmc\video\VideoDbUrl.cpp" />
     <ClCompile Include="..\..\xbmc\video\VideoInfoDownloader.cpp" />
     <ClCompile Include="..\..\xbmc\video\VideoInfoScanner.cpp" />
     <ClCompile Include="..\..\xbmc\video\VideoInfoTag.cpp" />
@@ -1208,7 +1218,6 @@
     <ClCompile Include="..\..\xbmc\win32\Win32DelayedDllLoad.cpp" />
     <ClCompile Include="..\..\xbmc\win32\win32env.cpp" />
     <ClCompile Include="..\..\xbmc\win32\WIN32Util.cpp" />
-    <ClCompile Include="..\..\xbmc\win32\WINDirectSound.cpp" />
     <ClCompile Include="..\..\xbmc\win32\WindowHelper.cpp" />
     <ClCompile Include="..\..\xbmc\win32\XBMC_PC.cpp" />
     <ClCompile Include="..\..\xbmc\cores\DummyVideoPlayer.cpp" />
@@ -1440,7 +1449,7 @@
     <ClCompile Include="..\..\xbmc\addons\Scraper.cpp" />
     <ClCompile Include="..\..\xbmc\addons\ScreenSaver.cpp" />
     <ClCompile Include="..\..\xbmc\addons\Visualisation.cpp" />
-    <ClCompile Include="..\..\xbmc\cdrip\CDDAReader.cpp" />
+    <ClCompile Include="..\..\xbmc\cdrip\CDDARipJob.cpp" />
     <ClCompile Include="..\..\xbmc\cdrip\CDDARipper.cpp" />
     <ClCompile Include="..\..\xbmc\cdrip\Encoder.cpp" />
     <ClCompile Include="..\..\xbmc\cdrip\EncoderFlac.cpp" />
@@ -1526,7 +1535,6 @@
     <ClInclude Include="..\..\xbmc\dialogs\GUIDialogFileBrowser.h" />
     <ClInclude Include="..\..\xbmc\dialogs\GUIDialogGamepad.h" />
     <ClInclude Include="..\..\xbmc\dialogs\GUIDialogKaiToast.h" />
-    <ClInclude Include="..\..\xbmc\dialogs\GUIDialogKeyboard.h" />
     <ClInclude Include="..\..\xbmc\dialogs\GUIDialogMediaSource.h" />
     <ClInclude Include="..\..\xbmc\dialogs\GUIDialogMuteBug.h" />
     <ClInclude Include="..\..\xbmc\dialogs\GUIDialogNumeric.h" />
@@ -1679,7 +1687,6 @@
     <ClInclude Include="..\..\xbmc\input\KeyboardLayoutConfiguration.h" />
     <ClInclude Include="..\..\xbmc\input\KeyboardStat.h" />
     <ClInclude Include="..\..\xbmc\input\MouseStat.h" />
-    <ClInclude Include="..\..\xbmc\input\SDLJoystick.h" />
     <ClInclude Include="..\..\xbmc\input\windows\IRServerSuite.h" />
     <ClInclude Include="..\..\xbmc\input\windows\IrssMessage.h" />
     <ClInclude Include="..\..\xbmc\input\XBIRRemote.h" />
@@ -1871,8 +1878,6 @@
     <ClInclude Include="..\..\xbmc\powermanagement\windows\Win32PowerSyscall.h" />
     <ClInclude Include="..\..\xbmc\programs\GUIViewStatePrograms.h" />
     <ClInclude Include="..\..\xbmc\programs\GUIWindowPrograms.h" />
-    <ClInclude Include="..\..\xbmc\programs\ProgramDatabase.h" />
-    <ClInclude Include="..\..\xbmc\programs\Shortcut.h" />
     <ClInclude Include="..\..\xbmc\pvr\addons\PVRClient.h" />
     <ClInclude Include="..\..\xbmc\pvr\addons\PVRClients.h" />
     <ClInclude Include="..\..\xbmc\pvr\channels\PVRChannel.h" />
@@ -1945,6 +1950,7 @@
     <ClInclude Include="..\..\xbmc\TextureCache.h" />
     <ClInclude Include="..\..\xbmc\TextureCacheJob.h" />
     <ClInclude Include="..\..\xbmc\TextureDatabase.h" />
+    <ClInclude Include="..\..\xbmc\DatabaseManager.h" />
     <ClInclude Include="..\..\xbmc\ThumbLoader.h" />
     <ClInclude Include="..\..\xbmc\ThumbnailCache.h" />
     <ClInclude Include="..\..\xbmc\URL.h" />
@@ -1959,6 +1965,7 @@
     <ClInclude Include="..\..\xbmc\utils\CharsetConverter.h" />
     <ClInclude Include="..\..\xbmc\utils\CPUInfo.h" />
     <ClInclude Include="..\..\xbmc\utils\Crc32.h" />
+    <ClInclude Include="..\..\xbmc\utils\DatabaseUtils.h" />
     <ClInclude Include="..\..\xbmc\utils\DownloadQueue.h" />
     <ClInclude Include="..\..\xbmc\utils\DownloadQueueManager.h" />
     <ClInclude Include="..\..\xbmc\utils\EndianSwap.h" />
@@ -1979,6 +1986,7 @@
     <ClInclude Include="..\..\xbmc\utils\HttpResponse.h" />
     <ClInclude Include="..\..\xbmc\utils\InfoLoader.h" />
     <ClInclude Include="..\..\xbmc\utils\ISerializable.h" />
+    <ClInclude Include="..\..\xbmc\utils\ISortable.h" />
     <ClInclude Include="..\..\xbmc\utils\Job.h" />
     <ClInclude Include="..\..\xbmc\utils\JobManager.h" />
     <ClInclude Include="..\..\xbmc\utils\JSONVariantParser.h" />
@@ -2001,8 +2009,9 @@
     <ClInclude Include="..\..\xbmc\utils\SaveFileStateJob.h" />
     <ClInclude Include="..\..\xbmc\utils\ScraperParser.h" />
     <ClInclude Include="..\..\xbmc\utils\ScraperUrl.h" />
+    <ClInclude Include="..\..\xbmc\utils\SeekHandler.h" />
+    <ClInclude Include="..\..\xbmc\utils\SortUtils.h" />
     <ClInclude Include="..\..\xbmc\utils\Splash.h" />
-    <ClInclude Include="..\..\xbmc\utils\ssrc.h" />
     <ClInclude Include="..\..\xbmc\utils\StdString.h" />
     <ClInclude Include="..\..\xbmc\utils\Stopwatch.h" />
     <ClInclude Include="..\..\xbmc\utils\StreamDetails.h" />
@@ -2014,9 +2023,9 @@
     <ClInclude Include="..\..\xbmc\utils\TimeUtils.h" />
     <ClInclude Include="..\..\xbmc\utils\TuxBoxUtil.h" />
     <ClInclude Include="..\..\xbmc\utils\URIUtils.h" />
+    <ClInclude Include="..\..\xbmc\utils\UrlOptions.h" />
     <ClInclude Include="..\..\xbmc\utils\Variant.h" />
     <ClInclude Include="..\..\xbmc\utils\Weather.h" />
-    <ClInclude Include="..\..\xbmc\utils\Win32Exception.h" />
     <ClInclude Include="..\..\xbmc\utils\XBMCTinyXML.h" />
     <ClInclude Include="..\..\xbmc\utils\XMLUtils.h" />
     <ClInclude Include="..\..\xbmc\video\Bookmark.h" />
@@ -2034,6 +2043,7 @@
     <ClInclude Include="..\..\xbmc\video\Teletext.h" />
     <ClInclude Include="..\..\xbmc\video\TeletextDefines.h" />
     <ClInclude Include="..\..\xbmc\video\VideoDatabase.h" />
+    <ClInclude Include="..\..\xbmc\video\VideoDbUrl.h" />
     <ClInclude Include="..\..\xbmc\video\VideoInfoDownloader.h" />
     <ClInclude Include="..\..\xbmc\video\VideoInfoScanner.h" />
     <ClInclude Include="..\..\xbmc\video\VideoInfoTag.h" />
@@ -2059,7 +2069,6 @@
     <ClInclude Include="..\..\xbmc\win32\stat_utf8.h" />
     <ClInclude Include="..\..\xbmc\win32\stdio_utf8.h" />
     <ClInclude Include="..\..\xbmc\win32\WIN32Util.h" />
-    <ClInclude Include="..\..\xbmc\win32\WINDirectSound.h" />
     <ClInclude Include="..\..\xbmc\win32\WindowHelper.h" />
     <ClInclude Include="..\..\xbmc\cores\DummyVideoPlayer.h" />
     <ClInclude Include="..\..\xbmc\cores\IPlayer.h" />
@@ -2287,7 +2296,7 @@
     <ClInclude Include="..\..\xbmc\addons\Scraper.h" />
     <ClInclude Include="..\..\xbmc\addons\ScreenSaver.h" />
     <ClInclude Include="..\..\xbmc\addons\Visualisation.h" />
-    <ClInclude Include="..\..\xbmc\cdrip\CDDAReader.h" />
+    <ClInclude Include="..\..\xbmc\cdrip\CDDARipJob.h" />
     <ClInclude Include="..\..\xbmc\cdrip\CDDARipper.h" />
     <ClInclude Include="..\..\xbmc\cdrip\DllLameenc.h" />
     <ClInclude Include="..\..\xbmc\cdrip\DllFlacEnc.h" />

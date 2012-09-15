@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -53,6 +53,7 @@ CPVRRecording::CPVRRecording(const PVR_RECORDING &recording, unsigned int iClien
   m_strStreamURL   = recording.strStreamURL;
   m_strChannelName = recording.strChannelName;
   m_genre          = StringUtils::Split(CEpg::ConvertGenreIdToString(recording.iGenreType, recording.iGenreSubType), g_advancedSettings.m_videoItemSeparator);
+  m_iRecPlayCount  = recording.iPlayCount;
 }
 
 bool CPVRRecording::operator ==(const CPVRRecording& right) const
@@ -70,7 +71,8 @@ bool CPVRRecording::operator ==(const CPVRRecording& right) const
        m_iLifetime          == right.m_iLifetime &&
        m_strDirectory       == right.m_strDirectory &&
        m_strFileNameAndPath == right.m_strFileNameAndPath &&
-       m_strTitle           == right.m_strTitle);
+       m_strTitle           == right.m_strTitle &&
+       m_iRecPlayCount      == right.m_iRecPlayCount);
 }
 
 bool CPVRRecording::operator !=(const CPVRRecording& right) const
@@ -88,6 +90,7 @@ void CPVRRecording::Reset(void)
   m_iPriority          = -1;
   m_iLifetime          = -1;
   m_strFileNameAndPath = StringUtils::EmptyString;
+  m_iRecPlayCount      = 0;
 
   m_recordingTime.Reset();
   CVideoInfoTag::Reset();
@@ -103,8 +106,8 @@ int CPVRRecording::GetDuration() const
 
 bool CPVRRecording::Delete(void)
 {
-  PVR_ERROR error;
-  if (!g_PVRClients->DeleteRecording(*this, &error))
+  PVR_ERROR error = g_PVRClients->DeleteRecording(*this);
+  if (error != PVR_ERROR_NO_ERROR)
   {
     DisplayError(error);
     return false;
@@ -115,9 +118,23 @@ bool CPVRRecording::Delete(void)
 
 bool CPVRRecording::Rename(const CStdString &strNewName)
 {
-  PVR_ERROR error;
   m_strTitle.Format("%s", strNewName);
-  if (!g_PVRClients->RenameRecording(*this, &error))
+  PVR_ERROR error = g_PVRClients->RenameRecording(*this);
+  if (error != PVR_ERROR_NO_ERROR)
+  {
+    DisplayError(error);
+    return false;
+  }
+
+  return true;
+}
+
+bool CPVRRecording::SetPlayCount(int count)
+{
+  PVR_ERROR error;
+  m_iRecPlayCount = count;
+  if (g_PVRClients->SupportsRecordingPlayCount(m_iClientId) &&
+      !g_PVRClients->SetRecordingPlayCount(*this, count, &error))
   {
     DisplayError(error);
     return false;
@@ -130,9 +147,7 @@ void CPVRRecording::DisplayError(PVR_ERROR err) const
 {
   if (err == PVR_ERROR_SERVER_ERROR)
     CGUIDialogOK::ShowAndGetInput(19033,19111,19110,0); /* print info dialog "Server error!" */
-  else if (err == PVR_ERROR_NOT_SYNC)
-    CGUIDialogOK::ShowAndGetInput(19033,19108,19110,0); /* print info dialog "Recordings not in sync!" */
-  else if (err == PVR_ERROR_NOT_DELETED)
+  else if (err == PVR_ERROR_REJECTED)
     CGUIDialogOK::ShowAndGetInput(19033,19068,19110,0); /* print info dialog "Couldn't delete recording!" */
   else
     CGUIDialogOK::ShowAndGetInput(19033,19147,19110,0); /* print info dialog "Unknown error!" */
@@ -155,6 +170,7 @@ void CPVRRecording::Update(const CPVRRecording &tag)
   m_strStreamURL   = tag.m_strStreamURL;
   m_strChannelName = tag.m_strChannelName;
   m_genre          = tag.m_genre;
+  m_iRecPlayCount  = tag.m_iRecPlayCount;
 
   CStdString strShow;
   strShow.Format("%s - ", g_localizeStrings.Get(20364).c_str());

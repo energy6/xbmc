@@ -1,5 +1,5 @@
 /*
-*      Copyright (C) 2005-2008 Team XBMC
+*      Copyright (C) 2012 Team XBMC
 *      http://www.xbmc.org
 *
 *  This Program is free software; you can redistribute it and/or modify
@@ -31,7 +31,7 @@
 #include "threads/SystemClock.h"
 #include "GUIInfoManager.h"
 
-#include "epg/EpgInfoTag.h"
+#include "epg/Epg.h"
 #include "pvr/channels/PVRChannel.h"
 
 #include "GUIEPGGridContainer.h"
@@ -248,7 +248,7 @@ void CGUIEPGGridContainer::Render()
 
     pos -= missingSection * m_blockSize;
   }
-  while (pos < end && m_rulerItems.size())
+  while (pos < end && (rulerOffset/m_rulerUnit+1) < m_rulerItems.size())
   {
     item = m_rulerItems[rulerOffset/m_rulerUnit+1];
     if (m_orientation == VERTICAL)
@@ -650,11 +650,9 @@ bool CGUIEPGGridContainer::OnAction(const CAction &action)
     break;
 
   default:
-
     if (action.GetID())
-    {
       return OnClick(action.GetID());
-    }
+    break;
   }
 
   return false;
@@ -687,7 +685,7 @@ bool CGUIEPGGridContainer::OnMessage(CGUIMessage& message)
         int iCurrentChannelNumber = tag->PVRChannelNumber();
         if (iCurrentChannelNumber != iLastChannelNumber)
         {
-          const CPVRChannel *channel = tag->ChannelTag();
+          CPVRChannelPtr channel = tag->ChannelTag();
           if (!channel)
             continue;
 
@@ -702,7 +700,7 @@ bool CGUIEPGGridContainer::OnMessage(CGUIMessage& message)
           m_channelItems.push_back(item);
         }
       }
-      if (m_epgItemsPtr.size() > 0)
+      if (items->Size() > 0)
       {
         itemsPointer.stop = items->Size()-1;
         m_epgItemsPtr.push_back(itemsPointer);
@@ -725,7 +723,7 @@ bool CGUIEPGGridContainer::OnMessage(CGUIMessage& message)
       UpdateLayout(true); // true to refresh all items
 
       /* Create Ruler items */
-      CDateTime ruler = m_gridStart;
+      CDateTime ruler; ruler.SetFromUTCDateTime(m_gridStart);
       CDateTimeSpan unit(0, 0, m_rulerUnit * MINSPERBLOCK, 0);
       CGUIListItemPtr rulerItem(new CFileItem(ruler.GetAsLocalizedDate(true, true)));
       rulerItem->SetProperty("DateLabel", true);
@@ -793,7 +791,7 @@ void CGUIEPGGridContainer::UpdateItems()
     CDateTime gridCursor  = m_gridStart; //reset cursor for new channel
     unsigned long progIdx = m_epgItemsPtr[row].start;
     unsigned long lastIdx = m_epgItemsPtr[row].stop;
-    int channelnum        = ((CFileItem *)m_programmeItems[progIdx].get())->GetEPGInfoTag()->PVRChannelNumber();
+    int iEpgId            = ((CFileItem *)m_programmeItems[progIdx].get())->GetEPGInfoTag()->EpgID();
 
     /** FOR EACH BLOCK **********************************************************************/
 
@@ -806,18 +804,18 @@ void CGUIEPGGridContainer::UpdateItems()
         if (tag == NULL)
           progIdx++;
 
-        if (tag->PVRChannelNumber() != channelnum)
+        if (tag->EpgID() != iEpgId)
           break;
 
-        if (m_gridEnd <= tag->StartAsLocalTime())
+        if (m_gridEnd <= tag->StartAsUTC())
         {
           break;
         }
-        else if (gridCursor >= tag->EndAsLocalTime())
+        else if (gridCursor >= tag->EndAsUTC())
         {
           progIdx++;
         }
-        else if (gridCursor < tag->EndAsLocalTime())
+        else if (gridCursor < tag->EndAsUTC())
         {
           m_gridIndex[row][block].item = item;
           break;
@@ -1307,7 +1305,10 @@ bool CGUIEPGGridContainer::OnMouseWheel(char wheel, const CPoint &point)
 
 int CGUIEPGGridContainer::GetSelectedItem() const
 {
-  if (!m_gridIndex || !m_epgItemsPtr.size())
+  if (!m_gridIndex ||
+      !m_epgItemsPtr.size() ||
+      m_channelCursor + m_channelCursor >= (int)m_channelItems.size() ||
+      m_blockCursor + m_blockOffset >= (int)m_programmeItems.size())
     return 0;
 
   CGUIListItemPtr currentItem = m_gridIndex[m_channelCursor + m_channelOffset][m_blockCursor + m_blockOffset].item;
@@ -1626,11 +1627,29 @@ void CGUIEPGGridContainer::Reset()
 void CGUIEPGGridContainer::GoToBegin()
 {
   ScrollToBlockOffset(0);
+  SetBlock(0);
 }
 
 void CGUIEPGGridContainer::GoToEnd()
 {
-  ScrollToBlockOffset(m_blocks - m_blocksPerPage);
+  int blocksEnd = 0;   // the end block of the last epg element for the selected channel
+  int blocksStart = 0; // the start block of the last epg element for the selected channel
+  int blockOffset = 0; // the block offset to scroll to
+  for (int blockIndex = m_blocks; blockIndex >= 0 && (!blocksEnd || !blocksStart); blockIndex--)
+  {
+    if (!blocksEnd && m_gridIndex[m_channelCursor + m_channelOffset][blockIndex].item != NULL)
+      blocksEnd = blockIndex;
+    if (blocksEnd && m_gridIndex[m_channelCursor + m_channelOffset][blocksEnd].item != 
+                     m_gridIndex[m_channelCursor + m_channelOffset][blockIndex].item)
+      blocksStart = blockIndex + 1;
+  }
+  if (blocksEnd - blocksStart > m_blocksPerPage)
+    blockOffset = blocksStart;
+  else if (blocksEnd > m_blocksPerPage)
+    blockOffset = blocksEnd - m_blocksPerPage;
+
+  ScrollToBlockOffset(blockOffset); // scroll to the start point of the last epg element
+  SetBlock(m_blocksPerPage - 1);    // select the last epg element
 }
 
 void CGUIEPGGridContainer::SetStartEnd(CDateTime start, CDateTime end)

@@ -33,6 +33,7 @@
 #include "File.h"
 #include "SpecialProtocol.h"
 #include "utils/URIUtils.h"
+#include "URL.h"
 
 using namespace ADDON;
 
@@ -67,7 +68,7 @@ bool CAddonsDirectory::GetDirectory(const CStdString& strPath, CFileItemList &it
   else if (path.GetHostName().Equals("disabled"))
   { // grab all disabled addons, including disabled repositories
     reposAsFolders = false;
-    CAddonMgr::Get().GetAllAddons(addons, false, true, false);
+    CAddonMgr::Get().GetAllAddons(addons, false, true);
     items.SetProperty("reponame",g_localizeStrings.Get(24039));
     items.SetLabel(g_localizeStrings.Get(24039));
   }
@@ -299,10 +300,19 @@ bool CAddonsDirectory::GetScriptsAndPlugins(const CStdString &content, CFileItem
 
   for (unsigned i=0; i<addons.size(); i++)
   {
-    if (addons[i]->Type() == ADDON_PLUGIN)
-      items.Add(FileItemFromAddon(addons[i], "plugin://", true));
-    else
-      items.Add(FileItemFromAddon(addons[i], "script://", false));
+    CFileItemPtr item(FileItemFromAddon(addons[i], 
+                      addons[i]->Type()==ADDON_PLUGIN?"plugin://":"script://",
+                      addons[i]->Type() == ADDON_PLUGIN));
+    PluginPtr plugin = boost::dynamic_pointer_cast<CPluginSource>(addons[i]);
+    if (plugin->ProvidesSeveral())
+    {
+      CURL url = item->GetAsUrl();
+      CStdString opt;
+      opt.Format("?content_type=%s",content.c_str());
+      url.SetOptions(opt);
+      item->SetPath(url.Get());
+    }
+    items.Add(item);
   }
 
   items.Add(GetMoreItem(content));
@@ -319,7 +329,7 @@ CFileItemPtr CAddonsDirectory::GetMoreItem(const CStdString &content)
   item->SetLabelPreformated(true);
   item->SetLabel(g_localizeStrings.Get(21452));
   item->SetIconImage("DefaultAddon.png");
-  item->SetSpecialSort(SORT_ON_BOTTOM);
+  item->SetSpecialSort(SortSpecialOnBottom);
   return item;
 }
   

@@ -21,9 +21,7 @@
 
 #include "threads/SystemClock.h"
 #include "GUILargeTextureManager.h"
-#include "pictures/Picture.h"
 #include "settings/GUISettings.h"
-#include "FileItem.h"
 #include "guilib/Texture.h"
 #include "threads/SingleLock.h"
 #include "utils/TimeUtils.h"
@@ -31,7 +29,6 @@
 #include "guilib/GraphicContext.h"
 #include "utils/log.h"
 #include "TextureCache.h"
-#include "TextureCacheJob.h"
 
 using namespace std;
 
@@ -64,14 +61,10 @@ bool CImageLoader::DoWork()
   if (!loadPath.IsEmpty())
   {
     // direct route - load the image
-    m_texture = new CTexture();
     unsigned int start = XbmcThreads::SystemClockMillis();
-    if (!m_texture->LoadFromFile(loadPath, g_graphicsContext.GetWidth(), g_graphicsContext.GetHeight(), g_guiSettings.GetBool("pictures.useexifrotation")))
-    {
-      delete m_texture;
-      m_texture = NULL;
+    m_texture = CBaseTexture::LoadFromFile(loadPath, g_graphicsContext.GetWidth(), g_graphicsContext.GetHeight(), g_guiSettings.GetBool("pictures.useexifrotation"));
+    if (!m_texture)
       return false;
-    }
     if (XbmcThreads::SystemClockMillis() - start > 100)
       CLog::Log(LOGDEBUG, "%s - took %u ms to load %s", __FUNCTION__, XbmcThreads::SystemClockMillis() - start, loadPath.c_str());
 
@@ -190,12 +183,6 @@ void CGUILargeTextureManager::ReleaseImage(const CStdString &path, bool immediat
       return;
     }
   }
-  assert(false);
-}
-
-void CGUILargeTextureManager::ReleaseQueuedImage(const CStdString &path)
-{
-  CSingleLock lock(m_listSection);
   for (queueIterator it = m_queued.begin(); it != m_queued.end(); ++it)
   {
     unsigned int id = it->first;

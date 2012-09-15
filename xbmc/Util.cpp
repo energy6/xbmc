@@ -20,7 +20,7 @@
  */
 #include "threads/SystemClock.h"
 #include "system.h"
-#ifdef __APPLE__
+#if defined(TARGET_DARWIN)
 #include <sys/param.h>
 #include <mach-o/dyld.h>
 #endif
@@ -39,17 +39,14 @@
 #endif
 
 #include "Application.h"
-#include "utils/AutoPtrHandle.h"
 #include "Util.h"
 #include "addons/Addon.h"
-#include "storage/IoSupport.h"
 #include "filesystem/PVRDirectory.h"
+#include "filesystem/Directory.h"
 #include "filesystem/StackDirectory.h"
 #include "filesystem/MultiPathDirectory.h"
-#include "filesystem/DirectoryCache.h"
 #include "filesystem/SpecialProtocol.h"
 #include "filesystem/RSSDirectory.h"
-#include "ThumbnailCache.h"
 #ifdef HAS_FILESYSTEM_RAR
 #include "filesystem/RarManager.h"
 #endif
@@ -65,19 +62,15 @@
 #include "guilib/TextureManager.h"
 #include "utils/fstrcmp.h"
 #include "storage/MediaManager.h"
-#include "guilib/DirectXGraphics.h"
-#include "network/DNSNameCache.h"
-#include "guilib/GUIWindowManager.h"
 #ifdef _WIN32
 #include <shlobj.h>
 #include "WIN32Util.h"
 #endif
-#if defined(__APPLE__)
+#if defined(TARGET_DARWIN)
 #include "osx/DarwinUtils.h"
 #endif
 #include "GUIUserMessages.h"
 #include "filesystem/File.h"
-#include "utils/Crc32.h"
 #include "settings/Settings.h"
 #include "utils/StringUtils.h"
 #include "settings/AdvancedSettings.h"
@@ -94,7 +87,10 @@
 #include "cores/dvdplayer/DVDSubtitles/DVDSubtitleTagSami.h"
 #include "cores/dvdplayer/DVDSubtitles/DVDSubtitleStream.h"
 #include "windowing/WindowingFactory.h"
-#include "video/VideoInfoTag.h"
+#include "URL.h"
+#ifdef HAVE_LIBCAP
+  #include <sys/capability.h>
+#endif
 
 using namespace std;
 using namespace XFILE;
@@ -103,7 +99,6 @@ using namespace XFILE;
 static const int64_t SECS_BETWEEN_EPOCHS = 11644473600LL;
 static const int64_t SECS_TO_100NS = 10000000;
 
-using namespace AUTOPTR;
 using namespace XFILE;
 using namespace PLAYLIST;
 
@@ -255,7 +250,6 @@ bool CUtil::GetVolumeFromFileName(const CStdString& strFileName, CStdString& str
       CLog::Log(LOGERROR, "Invalid RegExp:[%s]", regexps[i].c_str());
       continue;
     }
-//    CLog::Log(LOGDEBUG, "Regexp:[%s]", regexps[i].c_str());
 
     int iFoundToken = reg.RegFind(strFileName.c_str());
     if (iFoundToken >= 0)
@@ -508,7 +502,7 @@ void CUtil::GetHomePath(CStdString& strPath, const CStdString& strTarget)
   }
   else
   {
-#ifdef __APPLE__
+#if defined(TARGET_DARWIN)
     int      result = -1;
     char     given_path[2*MAXPATHLEN];
     uint32_t path_size =2*MAXPATHLEN;
@@ -520,7 +514,7 @@ void CUtil::GetHomePath(CStdString& strPath, const CStdString& strTarget)
       for (int n=strlen(given_path)-1; given_path[n] != '/'; n--)
         given_path[n] = '\0';
 
-      #if defined(__arm__)
+      #if defined(TARGET_DARWIN_IOS)
         strcat(given_path, "/XBMCData/XBMCHome/");
       #else
         // Assume local path inside application bundle.
@@ -543,7 +537,7 @@ void CUtil::GetHomePath(CStdString& strPath, const CStdString& strTarget)
       strPath = strHomePath;
   }
 
-#if defined(_LINUX) && !defined(__APPLE__)
+#if defined(_LINUX) && !defined(TARGET_DARWIN)
   /* Change strPath accordingly when target is XBMC_HOME and when INSTALL_PATH
    * and BIN_INSTALL_PATH differ
    */
@@ -800,26 +794,6 @@ int64_t CUtil::ToInt64(uint32_t high, uint32_t low)
   n <<= 32;
   n += low;
   return n;
-}
-
-bool CUtil::ThumbExists(const CStdString& strFileName, bool bAddCache)
-{
-  return CThumbnailCache::GetThumbnailCache()->ThumbExists(strFileName, bAddCache);
-}
-
-void CUtil::ThumbCacheAdd(const CStdString& strFileName, bool bFileExists)
-{
-  CThumbnailCache::GetThumbnailCache()->Add(strFileName, bFileExists);
-}
-
-void CUtil::ThumbCacheClear()
-{
-  CThumbnailCache::GetThumbnailCache()->Clear();
-}
-
-bool CUtil::ThumbCached(const CStdString& strFileName)
-{
-  return CThumbnailCache::GetThumbnailCache()->IsCached(strFileName);
 }
 
 CStdString CUtil::GetNextFilename(const CStdString &fn_template, int max)
@@ -1157,7 +1131,7 @@ void CUtil::Stat64ToStat(struct stat *result, struct __stat64 *stat)
     result->st_size = (_off_t)stat->st_size;
 #else
   if (sizeof(stat->st_size) <= sizeof(result->st_size) )
-    result->st_size = (off_t)stat->st_size;
+    result->st_size = stat->st_size;
 #endif
   else
   {
@@ -1184,7 +1158,7 @@ void CUtil::Stat64ToStat64i32(struct _stat64i32 *result, struct __stat64 *stat)
     result->st_size = (_off_t)stat->st_size;
 #else
   if (sizeof(stat->st_size) <= sizeof(result->st_size) )
-    result->st_size = (off_t)stat->st_size;
+    result->st_size = stat->st_size;
 #endif
   else
   {
@@ -1289,6 +1263,7 @@ CStdString CUtil::ValidatePath(const CStdString &path, bool bFixDoubleSlashes /*
   // recurse and crash XBMC
   if (URIUtils::IsURL(path) && 
      (path.Find('%') >= 0 ||
+      path.Left(4).Equals("apk:") ||
       path.Left(4).Equals("zip:") ||
       path.Left(4).Equals("rar:") ||
       path.Left(6).Equals("stack:") ||
@@ -1471,8 +1446,6 @@ int CUtil::GetMatchingSource(const CStdString& strPath1, VECSOURCES& VECSOURCES,
   if (strPath1.IsEmpty())
     return -1;
 
-  //CLog::Log(LOGDEBUG,"CUtil::GetMatchingSource, testing original path/name [%s]", strPath1.c_str());
-
   // copy as we may change strPath
   CStdString strPath = strPath1;
 
@@ -1494,7 +1467,6 @@ int CUtil::GetMatchingSource(const CStdString& strPath1, VECSOURCES& VECSOURCES,
   if (checkURL.GetProtocol() == "multipath")
     strPath = CMultiPathDirectory::GetFirstPath(strPath);
 
-  //CLog::Log(LOGDEBUG,"CUtil::GetMatchingSource, testing for matching name [%s]", strPath.c_str());
   bIsSourceName = false;
   int iIndex = -1;
   int iLength = -1;
@@ -1517,7 +1489,6 @@ int CUtil::GetMatchingSource(const CStdString& strPath1, VECSOURCES& VECSOURCES,
       if (iPos > 1)
         strName = strName.Mid(0, iPos - 1);
     }
-    //CLog::Log(LOGDEBUG,"CUtil::GetMatchingSource, comparing name [%s]", strName.c_str());
     if (strPath.Equals(strName))
     {
       bIsSourceName = true;
@@ -1536,8 +1507,6 @@ int CUtil::GetMatchingSource(const CStdString& strPath1, VECSOURCES& VECSOURCES,
   if (!URIUtils::HasSlashAtEnd(strDest))
     strDest += "/";
   int iLenPath = strDest.size();
-
-  //CLog::Log(LOGDEBUG,"CUtil::GetMatchingSource, testing url [%s]", strDest.c_str());
 
   for (int i = 0; i < (int)VECSOURCES.size(); ++i)
   {
@@ -1573,12 +1542,9 @@ int CUtil::GetMatchingSource(const CStdString& strPath1, VECSOURCES& VECSOURCES,
       if (!URIUtils::HasSlashAtEnd(strShare))
         strShare += "/";
       int iLenShare = strShare.size();
-      //CLog::Log(LOGDEBUG,"CUtil::GetMatchingSource, comparing url [%s]", strShare.c_str());
 
       if ((iLenPath >= iLenShare) && (strDest.Left(iLenShare).Equals(strShare)) && (iLenShare > iLength))
       {
-        //CLog::Log(LOGDEBUG,"Found matching source at index %i: [%s], Len = [%i]", i, strShare.c_str(), iLenShare);
-
         // if exact match, return it immediately
         if (iLenPath == iLenShare)
         {
@@ -2218,7 +2184,7 @@ CStdString CUtil::ResolveExecutablePath()
   ::GetModuleFileNameW(0, szAppPathW, sizeof(szAppPathW)/sizeof(szAppPathW[0]) - 1);
   CStdStringW strPathW = szAppPathW;
   g_charsetConverter.wToUTF8(strPathW,strExecutablePath);
-#elif defined(__APPLE__)
+#elif defined(TARGET_DARWIN)
   char     given_path[2*MAXPATHLEN];
   uint32_t path_size =2*MAXPATHLEN;
 
@@ -2258,7 +2224,7 @@ CStdString CUtil::ResolveExecutablePath()
 CStdString CUtil::GetFrameworksPath(bool forPython)
 {
   CStdString strFrameworksPath;
-#if defined(__APPLE__)
+#if defined(TARGET_DARWIN)
   char     given_path[2*MAXPATHLEN];
   uint32_t path_size =2*MAXPATHLEN;
 
@@ -2288,14 +2254,15 @@ void CUtil::ScanForExternalSubtitles(const CStdString& strMovie, std::vector<CSt
     NULL};
   
   vector<CStdString> vecExtensionsCached;
-  //strExtensionCached = "";
   
   CFileItem item(strMovie, false);
-  if (item.IsInternetStream()) return ;
-  if (item.IsHDHomeRun()) return ;
-  if (item.IsSlingbox()) return ;
-  if (item.IsPlayList()) return ;
-  if (!item.IsVideo()) return ;
+  if ( item.IsInternetStream()
+    || item.IsHDHomeRun()
+    || item.IsSlingbox()
+    || item.IsPlayList()
+    || item.IsLiveTV()
+    || !item.IsVideo())
+    return;
   
   vector<CStdString> strLookInPaths;
   
@@ -2596,5 +2563,41 @@ bool CUtil::IsVobSub( const std::vector<CStdString>& vecSubtitles, const CStdStr
     }
   }
   return false;
+}
+
+bool CUtil::CanBindPrivileged()
+{
+#ifdef _LINUX
+
+  if (geteuid() == 0)
+    return true; //root user can always bind to privileged ports
+
+#ifdef HAVE_LIBCAP
+
+  //check if CAP_NET_BIND_SERVICE is enabled, this allows non-root users to bind to privileged ports
+  bool canbind = false;
+  cap_t capabilities = cap_get_proc();
+  if (capabilities)
+  {
+    cap_flag_value_t value;
+    if (cap_get_flag(capabilities, CAP_NET_BIND_SERVICE, CAP_EFFECTIVE, &value) == 0)
+      canbind = value;
+
+    cap_free(capabilities);
+  }
+
+  return canbind;
+
+#else //HAVE_LIBCAP
+
+  return false;
+
+#endif //HAVE_LIBCAP
+
+#else //_LINUX
+
+  return true;
+
+#endif //_LINUX
 }
 

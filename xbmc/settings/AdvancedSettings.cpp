@@ -41,6 +41,7 @@ using namespace XFILE;
 
 CAdvancedSettings::CAdvancedSettings()
 {
+  m_initialized = false;
 }
 
 void CAdvancedSettings::Initialize()
@@ -54,6 +55,7 @@ void CAdvancedSettings::Initialize()
   m_audioForceDirectSound = false;
   m_audioAudiophile = false;
   m_allChannelStereo = false;
+  m_streamSilence = false;
   m_audioSinkBufferDurationMsec = 50;
   m_navSoundLevel = 0.3f;
 
@@ -129,10 +131,7 @@ void CAdvancedSettings::Initialize()
   m_lcdScrolldelay = 1;
   m_lcdHostName = "localhost";
 
-  m_autoDetectPingTime = 30;
-
   m_songInfoDuration = 10;
-  m_busyDialogDelay = 2000;
 
   m_cddbAddress = "freedb.freedb.org";
 
@@ -182,8 +181,8 @@ void CAdvancedSettings::Initialize()
   m_playlistAsFolders = true;
   m_detectAsUdf = false;
 
-  m_thumbSize = DEFAULT_THUMB_SIZE;
-  m_fanartHeight = DEFAULT_FANART_HEIGHT;
+  m_fanartRes = 1080;
+  m_imageRes = 720;
   m_useDDSFanart = false;
 
   m_sambaclienttimeout = 10;
@@ -216,7 +215,9 @@ void CAdvancedSettings::Initialize()
   m_bVideoLibraryCleanOnUpdate = false;
   m_bVideoLibraryExportAutoThumbs = false;
   m_bVideoLibraryImportWatchedState = false;
+  m_bVideoLibraryImportResumePoint = false;
   m_bVideoScannerIgnoreErrors = false;
+  m_iVideoLibraryDateAdded = 1; // prefer mtime over ctime and current time
 
   m_iTuxBoxStreamtsPort = 31339;
   m_bTuxBoxAudioChannelSelection = false;
@@ -278,7 +279,7 @@ void CAdvancedSettings::Initialize()
 
   m_cpuTempCmd = "";
   m_gpuTempCmd = "";
-#ifdef __APPLE__
+#if defined(TARGET_DARWIN)
   // default for osx is fullscreen always on top
   m_alwaysOnTop = true;
 #else
@@ -311,6 +312,10 @@ void CAdvancedSettings::Initialize()
   m_logEnableAirtunes = false;
   m_airTunesPort = 36666;
   m_airPlayPort = 36667;
+  m_initialized = true;
+
+  m_databaseMusic.Reset();
+  m_databaseVideo.Reset();
 }
 
 bool CAdvancedSettings::Load()
@@ -383,6 +388,7 @@ void CAdvancedSettings::ParseSettingsFile(const CStdString &file)
     XMLUtils::GetBoolean(pElement, "forceDirectSound", m_audioForceDirectSound);
     XMLUtils::GetBoolean(pElement, "audiophile", m_audioAudiophile);
     XMLUtils::GetBoolean(pElement, "allchannelstereo", m_allChannelStereo);
+    XMLUtils::GetBoolean(pElement, "streamsilence", m_streamSilence);
     XMLUtils::GetString(pElement, "transcodeto", m_audioTranscodeTo);
     XMLUtils::GetInt(pElement, "audiosinkbufferdurationmsec", m_audioSinkBufferDurationMsec);
 
@@ -637,6 +643,8 @@ void CAdvancedSettings::ParseSettingsFile(const CStdString &file)
     XMLUtils::GetString(pElement, "itemseparator", m_videoItemSeparator);
     XMLUtils::GetBoolean(pElement, "exportautothumbs", m_bVideoLibraryExportAutoThumbs);
     XMLUtils::GetBoolean(pElement, "importwatchedstate", m_bVideoLibraryImportWatchedState);
+    XMLUtils::GetBoolean(pElement, "importresumepoint", m_bVideoLibraryImportResumePoint);
+    XMLUtils::GetInt(pElement, "dateadded", m_iVideoLibraryDateAdded);
   }
 
   pElement = pRootElement->FirstChildElement("videoscanner");
@@ -670,7 +678,6 @@ void CAdvancedSettings::ParseSettingsFile(const CStdString &file)
   pElement = pRootElement->FirstChildElement("network");
   if (pElement)
   {
-    XMLUtils::GetInt(pElement, "autodetectpingtime", m_autoDetectPingTime, 1, 240);
     XMLUtils::GetInt(pElement, "curlclienttimeout", m_curlconnecttimeout, 1, 1000);
     XMLUtils::GetInt(pElement, "curllowspeedtime", m_curllowspeedtime, 1, 1000);
     XMLUtils::GetInt(pElement, "curlretries", m_curlretries, 0, 10);
@@ -718,18 +725,17 @@ void CAdvancedSettings::ParseSettingsFile(const CStdString &file)
     g_advancedSettings.m_logLevel = std::max(g_advancedSettings.m_logLevel, g_advancedSettings.m_logLevelHint);
     CLog::SetLogLevel(g_advancedSettings.m_logLevel);
   }
-     
+
   XMLUtils::GetString(pRootElement, "cddbaddress", m_cddbAddress);
 
   //airtunes + airplay
   XMLUtils::GetBoolean(pRootElement, "enableairtunesdebuglog", m_logEnableAirtunes);
   XMLUtils::GetInt(pRootElement,     "airtunesport", m_airTunesPort);
   XMLUtils::GetInt(pRootElement,     "airplayport", m_airPlayPort);  
-  
 
   XMLUtils::GetBoolean(pRootElement, "handlemounting", m_handleMounting);
 
-#ifdef HAS_SDL
+#if defined(HAS_SDL) || defined(TARGET_WINDOWS)
   XMLUtils::GetBoolean(pRootElement, "fullscreen", m_startFullScreen);
 #endif
   XMLUtils::GetBoolean(pRootElement, "splash", m_splashImage);
@@ -737,7 +743,6 @@ void CAdvancedSettings::ParseSettingsFile(const CStdString &file)
   XMLUtils::GetBoolean(pRootElement, "canwindowed", m_canWindowed);
 
   XMLUtils::GetInt(pRootElement, "songinfoduration", m_songInfoDuration, 0, INT_MAX);
-  XMLUtils::GetInt(pRootElement, "busydialogdelay", m_busyDialogDelay, 0, 5000);
   XMLUtils::GetInt(pRootElement, "playlistretries", m_playlistRetries, -1, 5000);
   XMLUtils::GetInt(pRootElement, "playlisttimeout", m_playlistTimeout, 0, 5000);
 
@@ -905,8 +910,8 @@ void CAdvancedSettings::ParseSettingsFile(const CStdString &file)
 
   XMLUtils::GetInt(pRootElement, "remotedelay", m_remoteDelay, 1, 20);
   XMLUtils::GetFloat(pRootElement, "controllerdeadzone", m_controllerDeadzone, 0.0f, 1.0f);
-  XMLUtils::GetInt(pRootElement, "thumbsize", m_thumbSize, 0, 1024);
-  XMLUtils::GetInt(pRootElement, "fanartheight", m_fanartHeight, 0, 1080);
+  XMLUtils::GetInt(pRootElement, "fanartres", m_fanartRes, 0, 1080);
+  XMLUtils::GetInt(pRootElement, "imageres", m_imageRes, 0, 1080);
   XMLUtils::GetBoolean(pRootElement, "useddsfanart", m_useDDSFanart);
 
   XMLUtils::GetBoolean(pRootElement, "playlistasfolders", m_playlistAsFolders);
@@ -1183,4 +1188,22 @@ float CAdvancedSettings::GetDisplayLatency(float refreshrate)
   }
 
   return delay; // in seconds
+}
+
+void CAdvancedSettings::SetDebugMode(bool debug)
+{
+  if (debug)
+  {
+    int level = std::max(m_logLevelHint, LOG_LEVEL_DEBUG_FREEMEM);
+    m_logLevel = level;
+    CLog::SetLogLevel(level);
+    CLog::Log(LOGNOTICE, "Enabled debug logging due to GUI setting. Level %d.", level);
+  }
+  else
+  {
+    int level = std::min(m_logLevelHint, LOG_LEVEL_DEBUG/*LOG_LEVEL_NORMAL*/);
+    CLog::Log(LOGNOTICE, "Disabled debug logging due to GUI setting. Level %d.", level);
+    m_logLevel = level;
+    CLog::SetLogLevel(level);
+  }
 }

@@ -30,6 +30,7 @@
 #include "filesystem/MultiPathDirectory.h"
 #include "GUIPassword.h"
 #include "Application.h"
+#include "ApplicationMessenger.h"
 #include "network/Network.h"
 #include "utils/RegExp.h"
 #include "PartyModeManager.h"
@@ -40,6 +41,7 @@
 #include "dialogs/GUIDialogProgress.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/GUISettings.h"
+#include "URL.h"
 
 #include "dialogs/GUIDialogSmartPlaylistEditor.h"
 #include "addons/GUIDialogAddonSettings.h"
@@ -57,11 +59,14 @@
 #include "utils/log.h"
 #include "utils/FileUtils.h"
 #include "guilib/GUIEditControl.h"
-#include "dialogs/GUIDialogKeyboard.h"
+#include "guilib/GUIKeyboardFactory.h"
 #ifdef HAS_PYTHON
 #include "interfaces/python/XBPython.h"
 #endif
 #include "interfaces/Builtins.h"
+#if defined(TARGET_ANDROID)
+#include "xbmc/android/activity/XBMCApp.h"
+#endif
 
 #define CONTROL_BTNVIEWASICONS     2
 #define CONTROL_BTNSORTBY          3
@@ -277,7 +282,7 @@ bool CGUIMediaWindow::OnMessage(CGUIMessage& message)
         if (GetProperty("filter").empty())
         {
           CStdString filter = GetProperty("filter").asString();
-          CGUIDialogKeyboard::ShowAndGetFilter(filter, false);
+          CGUIKeyboardFactory::ShowAndGetFilter(filter, false);
           SetProperty("filter", filter);
         }
         else
@@ -515,14 +520,14 @@ void CGUIMediaWindow::UpdateButtons()
   if (m_guiState.get())
   {
     // Update sorting controls
-    if (m_guiState->GetDisplaySortOrder()==SORT_ORDER_NONE)
+    if (m_guiState->GetDisplaySortOrder() == SortOrderNone)
     {
       CONTROL_DISABLE(CONTROL_BTNSORTASC);
     }
     else
     {
       CONTROL_ENABLE(CONTROL_BTNSORTASC);
-      if (m_guiState->GetDisplaySortOrder()==SORT_ORDER_ASC)
+      if (m_guiState->GetDisplaySortOrder() == SortOrderAscending)
       {
         CGUIMessage msg(GUI_MSG_DESELECTED, GetID(), CONTROL_BTNSORTASC);
         g_windowManager.SendMessage(msg);
@@ -770,7 +775,7 @@ bool CGUIMediaWindow::Update(const CStdString &strDirectory)
     pItem->SetLabel(strLabel);
     pItem->SetLabelPreformated(true);
     pItem->m_bIsFolder = true;
-    pItem->SetSpecialSort(SORT_ON_BOTTOM);
+    pItem->SetSpecialSort(SortSpecialOnBottom);
     m_vecItems->Add(pItem);
   }
   m_iLastControl = GetFocusedControlID();
@@ -852,14 +857,12 @@ void CGUIMediaWindow::OnPrepareFileItems(CFileItemList &items)
 // to modify the fileitems. Eg. to modify the item label
 void CGUIMediaWindow::OnFinalizeFileItems(CFileItemList &items)
 {
+  m_unfilteredItems->SetPath(items.GetPath()); // use the original path - it'll likely be relied on for other things later.
   m_unfilteredItems->Append(items);
   
   CStdString filter(GetProperty("filter").asString());
-  if (!filter.IsEmpty())
-  {
-    items.ClearItems();
-    GetFilteredItems(filter, items);
-  }
+
+  GetFilteredItems(filter, items);
 }
 
 // \brief With this function you can react on a users click in the list/thumb panel.
@@ -949,6 +952,14 @@ bool CGUIMediaWindow::OnClick(int iItem)
   {
     return XFILE::CPluginDirectory::RunScriptWithParams(pItem->GetPath());
   }
+#if defined(TARGET_ANDROID)
+  else if (pItem->IsAndroidApp())
+  {
+    CStdString appName = URIUtils::GetFileName(pItem->GetPath());
+    CLog::Log(LOGDEBUG, "CGUIMediaWindow::OnClick Trying to run: %s",appName.c_str());
+    return CXBMCApp::StartActivity(appName);
+  }
+#endif
   else
   {
     m_iSelectedItem = m_viewControl.GetSelectedItem();
@@ -1429,7 +1440,7 @@ void CGUIMediaWindow::GetContextButtons(int itemNumber, CContextButtons &buttons
 
   // TODO: FAVOURITES Conditions on masterlock and localisation
   if (!item->IsParentFolder() && !item->GetPath().Equals("add") && !item->GetPath().Equals("newplaylist://") &&
-      !item->GetPath().Left(19).Equals("newsmartplaylist://"))
+      !item->GetPath().Left(19).Equals("newsmartplaylist://") && !item->GetPath().Left(9).Equals("newtag://"))
   {
     if (CFavourites::IsFavourite(item.get(), GetID()))
       buttons.Add(CONTEXT_BUTTON_ADD_FAVOURITE, 14077);     // Remove Favourite
@@ -1470,7 +1481,7 @@ bool CGUIMediaWindow::OnContextButton(int itemNumber, CONTEXT_BUTTON button)
     {
       CStdString action;
       action.Format("contextmenuaction(%i)", button - CONTEXT_BUTTON_USER1);
-      g_application.getApplicationMessenger().ExecBuiltIn(m_vecItems->Get(itemNumber)->GetProperty(action).asString());
+      CApplicationMessenger::Get().ExecBuiltIn(m_vecItems->Get(itemNumber)->GetProperty(action).asString());
       return true;
     }
   default:
@@ -1525,9 +1536,9 @@ void CGUIMediaWindow::OnFilterItems(const CStdString &filter)
   
   m_viewControl.Clear();
   
-  CFileItemList items;
-  GetFilteredItems(filter, items);
-  if (filter.IsEmpty() || items.GetObjectCount() > 0)
+  CFileItemList items(m_unfilteredItems->GetPath()); // use the original path - it'll likely be relied on for other things later.
+  items.Append(*m_unfilteredItems);
+  if (GetFilteredItems(filter, items))
   {
     m_vecItems->ClearItems();
     m_vecItems->Append(items);
@@ -1540,24 +1551,22 @@ void CGUIMediaWindow::OnFilterItems(const CStdString &filter)
   UpdateButtons();
 }
 
-void CGUIMediaWindow::GetFilteredItems(const CStdString &filter, CFileItemList &items)
+bool CGUIMediaWindow::GetFilteredItems(const CStdString &filter, CFileItemList &items)
 {
   CStdString trimmedFilter(filter);
   trimmedFilter.TrimLeft().ToLower();
   
   if (trimmedFilter.IsEmpty())
-  {
-    items.Append(*m_unfilteredItems);
-    return;
-  }
-  
+    return true;
+
+  CFileItemList filteredItems(items.GetPath()); // use the original path - it'll likely be relied on for other things later.
   bool numericMatch = StringUtils::IsNaturalNumber(trimmedFilter);
-  for (int i = 0; i < m_unfilteredItems->Size(); i++)
+  for (int i = 0; i < items.Size(); i++)
   {
-    CFileItemPtr item = m_unfilteredItems->Get(i);
+    CFileItemPtr item = items.Get(i);
     if (item->IsParentFolder())
     {
-      items.Add(item);
+      filteredItems.Add(item);
       continue;
     }
     // TODO: Need to update this to get all labels, ideally out of the displayed info (ie from m_layout and m_focusedLayout)
@@ -1578,8 +1587,12 @@ void CGUIMediaWindow::GetFilteredItems(const CStdString &filter, CFileItemList &
     
     size_t pos = StringUtils::FindWords(match.c_str(), trimmedFilter.c_str());
     if (pos != CStdString::npos)
-      items.Add(item);
+      filteredItems.Add(item);
   }
+
+  items.ClearItems();
+  items.Append(filteredItems);
+  return (items.GetObjectCount() > 0);
 }
 
 CStdString CGUIMediaWindow::GetStartFolder(const CStdString &dir)

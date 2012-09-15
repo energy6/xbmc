@@ -31,7 +31,9 @@
 #include "filesystem/SpecialProtocol.h"
 #include "utils/log.h"
 #include "utils/URIUtils.h"
+#include "utils/StringUtils.h"
 #include "windowing/WindowingFactory.h"
+#include "URL.h"
 
 using namespace std;
 
@@ -242,7 +244,7 @@ void GUIFontManager::Unload(const CStdString& strFontName)
 {
   for (vector<CGUIFont*>::iterator iFont = m_vecFonts.begin(); iFont != m_vecFonts.end(); ++iFont)
   {
-    if ((*iFont)->GetFontName() == strFontName)
+    if ((*iFont)->GetFontName().Equals(strFontName))
     {
       delete (*iFont);
       m_vecFonts.erase(iFont);
@@ -269,7 +271,7 @@ CGUIFontTTFBase* GUIFontManager::GetFontFile(const CStdString& strFileName)
   for (int i = 0; i < (int)m_vecFontFiles.size(); ++i)
   {
     CGUIFontTTFBase* pFont = (CGUIFontTTFBase *)m_vecFontFiles[i];
-    if (pFont->GetFileName() == strFileName)
+    if (pFont->GetFileName().Equals(strFileName))
       return pFont;
   }
   return NULL;
@@ -280,7 +282,7 @@ CGUIFont* GUIFontManager::GetFont(const CStdString& strFontName, bool fallback /
   for (int i = 0; i < (int)m_vecFonts.size(); ++i)
   {
     CGUIFont* pFont = m_vecFonts[i];
-    if (pFont->GetFontName() == strFontName)
+    if (pFont->GetFontName().Equals(strFontName))
       return pFont;
   }
   // fall back to "font13" if we have none
@@ -418,7 +420,7 @@ void GUIFontManager::LoadFonts(const TiXmlNode* fontNode)
         if (pNode)
         {
           CStdString strFontFileName = pNode->FirstChild()->Value();
-          if (strFontFileName.Find(".ttf") >= 0)
+          if (strFontFileName.ToLower().Find(".ttf") >= 0)
           {
             int iSize = 20;
             int iStyle = FONT_STYLE_NORMAL;
@@ -429,16 +431,22 @@ void GUIFontManager::LoadFonts(const TiXmlNode* fontNode)
             if (iSize <= 0) iSize = 20;
 
             pNode = fontNode->FirstChild("style");
-            if (pNode)
+            if (pNode && pNode->FirstChild())
             {
-              CStdString style = pNode->FirstChild()->Value();
-              iStyle = FONT_STYLE_NORMAL;
-              if (style == "bold")
-                iStyle = FONT_STYLE_BOLD;
-              else if (style == "italics")
-                iStyle = FONT_STYLE_ITALICS;
-              else if (style == "bolditalics")
-                iStyle = FONT_STYLE_BOLD_ITALICS;
+              vector<string> styles = StringUtils::Split(pNode->FirstChild()->ValueStr(), " ");
+              for (vector<string>::iterator i = styles.begin(); i != styles.end(); ++i)
+              {
+                if (*i == "bold")
+                  iStyle |= FONT_STYLE_BOLD;
+                else if (*i == "italics")
+                  iStyle |= FONT_STYLE_ITALICS;
+                else if (*i == "bolditalics") // backward compatibility
+                  iStyle |= (FONT_STYLE_BOLD | FONT_STYLE_ITALICS);
+                else if (*i == "uppercase")
+                  iStyle |= FONT_STYLE_UPPERCASE;
+                else if (*i == "lowercase")
+                  iStyle |= FONT_STYLE_LOWERCASE;
+              }
             }
 
             XMLUtils::GetFloat(fontNode, "linespacing", lineSpacing);

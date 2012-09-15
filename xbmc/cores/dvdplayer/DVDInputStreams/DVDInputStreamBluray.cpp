@@ -32,6 +32,7 @@
 #include "filesystem/File.h"
 #include "filesystem/Directory.h"
 #include "DllLibbluray.h"
+#include "URL.h"
 
 #define LIBBLURAY_BYTESEEK 0
 
@@ -58,10 +59,10 @@ void DllLibbluray::file_close(BD_FILE_H *file)
 {
   if (file)
   {
+    CLog::Log(LOGDEBUG, "CDVDInputStreamBluray - Closed file (%p)\n", file);
+    
     delete static_cast<CFile*>(file->internal);
     delete file;
-
-    CLog::Log(LOGDEBUG, "CDVDInputStreamBluray - Closed file (%p)\n", file);
   }
 }
 
@@ -124,10 +125,10 @@ BD_FILE_H * DllLibbluray::file_open(const char* filename, const char *mode)
       return file;
     }
 
+    CLog::Log(LOGDEBUG, "CDVDInputStreamBluray - Error opening file! (%p)", file);
+    
     delete fp;
     delete file;
-
-    CLog::Log(LOGDEBUG, "CDVDInputStreamBluray - Error opening file! (%p)", file);
 
     return NULL;
 }
@@ -220,6 +221,10 @@ CDVDInputStreamBluray::CDVDInputStreamBluray(IDVDPlayer* player) :
   }
   m_content = "video/x-mpegts";
   m_player  = player;
+  m_title_playing = false;
+  m_navmode = false;
+  m_hold = HOLD_NONE;
+  memset(&m_event, 0, sizeof(m_event));
 }
 
 CDVDInputStreamBluray::~CDVDInputStreamBluray()
@@ -640,7 +645,7 @@ void CDVDInputStreamBluray::OverlayCallback(const BD_OVERLAY * const ov)
     return;
   }
 
-  group->iPTSStartTime = ov->pts;
+  group->iPTSStartTime = (double) ov->pts;
   group->iPTSStopTime  = 0;
 
   if (ov->plane > 1)

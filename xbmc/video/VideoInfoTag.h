@@ -25,6 +25,7 @@
 #include "XBDateTime.h"
 #include "utils/ScraperUrl.h"
 #include "utils/Fanart.h"
+#include "utils/ISortable.h"
 #include "utils/StreamDetails.h"
 #include "video/Bookmark.h"
 #include "XBDateTime.h"
@@ -41,7 +42,7 @@ struct SActorInfo
   CStdString thumb;
 };
 
-class CVideoInfoTag : public IArchivable, public ISerializable
+class CVideoInfoTag : public IArchivable, public ISerializable, public ISortable
 {
 public:
   CVideoInfoTag() { Reset(); };
@@ -65,6 +66,7 @@ public:
   bool Save(TiXmlNode *node, const CStdString &tag, bool savePathInfo = true, const TiXmlElement *additionalNode = NULL);
   virtual void Archive(CArchive& ar);
   virtual void Serialize(CVariant& value);
+  virtual void ToSortable(SortItem& sortable);
   const CStdString GetCast(bool bIncludeRole = false) const;
   bool HasStreamDetails() const;
   bool IsEmpty() const;
@@ -93,8 +95,9 @@ public:
   std::vector<std::string> m_artist;
   std::vector< SActorInfo > m_cast;
   typedef std::vector< SActorInfo >::const_iterator iCast;
-  std::vector<std::string> m_set;
-  std::vector<int> m_setId;
+  CStdString m_strSet;
+  int m_iSetId;
+  std::vector<std::string> m_tags;
   CStdString m_strRuntime;
   CStdString m_strFile;
   CStdString m_strPath;
@@ -127,6 +130,7 @@ public:
   float m_fEpBookmark;
   int m_iBookmarkId;
   int m_iIdShow;
+  int m_iIdSeason;
   CFanart m_fanart;
   CStreamDetails m_streamDetails;
   CBookmark m_resumePoint;

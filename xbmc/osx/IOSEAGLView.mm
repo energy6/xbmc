@@ -30,6 +30,7 @@
 #include "AdvancedSettings.h"
 #include "FileItem.h"
 #include "Application.h"
+#include "ApplicationMessenger.h"
 #include "WindowingFactory.h"
 #include "VideoReferenceClock.h"
 #include "utils/log.h"
@@ -72,7 +73,9 @@
 {
   CGRect frame = [IOSScreenManager getLandscapeResolution: currentScreen]; 
   CAEAGLLayer *eaglLayer = (CAEAGLLayer *)[self layer];  
-  if(frame.size.width * frame.size.height > 921600)
+  //allow a maximum framebuffer size of 1080p
+  //needed for tvout on iPad3 and maybe AppleTV3
+  if(frame.size.width * frame.size.height > 2073600)
     return;
   //resize the layer - ios will delay this
   //and call layoutSubviews when its done with resizing
@@ -344,7 +347,7 @@
     if (!g_application.m_bStop)
     {
       ThreadMessage tMsg = {TMSG_QUIT};
-      g_application.getApplicationMessenger().SendMessage(tMsg);
+      CApplicationMessenger::Get().SendMessage(tMsg);
     }
     // wait for animation thread to die
     if ([animationThread isFinished] == NO)
@@ -356,6 +359,7 @@
 - (void) runAnimation:(id) arg
 {
   CCocoaAutoPool outerpool;
+  bool readyToRun = true;
 
   // signal we are alive
   NSConditionLock* myLock = arg;
@@ -379,7 +383,25 @@
   setlocale(LC_NUMERIC, "C");
  
   g_application.Preflight();
-  if (g_application.Create())
+  if (!g_application.Create())
+  {
+    readyToRun = false;
+    NSLog(@"%sUnable to create application", __PRETTY_FUNCTION__);
+  }
+
+  if (!g_application.CreateGUI())
+  {
+    readyToRun = false;
+    NSLog(@"%sUnable to create GUI", __PRETTY_FUNCTION__);
+  }
+
+  if (!g_application.Initialize())
+  {
+    readyToRun = false;
+    NSLog(@"%sUnable to initialize application", __PRETTY_FUNCTION__);
+  }
+  
+  if (readyToRun)
   {
     g_advancedSettings.m_startFullScreen = true;
     g_advancedSettings.m_canWindowed = false;
@@ -393,10 +415,6 @@
     {
       NSLog(@"%sException caught on main loop. Exiting", __PRETTY_FUNCTION__);
     }
-  }
-  else
-  {
-    NSLog(@"%sUnable to create application", __PRETTY_FUNCTION__);
   }
 
   // signal we are dead

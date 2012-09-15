@@ -20,7 +20,6 @@
  */
 
 #include "DVDInputStreamNavigator.h"
-#include "Util.h"
 #include "utils/LangCodeExpander.h"
 #include "../DVDDemuxSPU.h"
 #include "DVDStateSerializer.h"
@@ -28,8 +27,7 @@
 #include "LangInfo.h"
 #include "utils/log.h"
 #include "guilib/Geometry.h"
-#include "filesystem/IFile.h"
-#ifdef __APPLE__
+#if defined(TARGET_DARWIN)
 #include "CocoaInterface.h"
 #endif
 
@@ -52,6 +50,11 @@ CDVDInputStreamNavigator::CDVDInputStreamNavigator(IDVDPlayer* player) : CDVDInp
   m_iTitle = m_iTitleCount = 0;
   m_iPart = m_iPartCount = 0;
   m_iTime = m_iTotalTime = 0;
+  m_bEOF = false;
+  m_icurrentGroupId = 0;
+  m_lastevent = DVDNAV_NOP;
+
+  memset(m_lastblock, 0, sizeof(m_lastblock));
 }
 
 CDVDInputStreamNavigator::~CDVDInputStreamNavigator()
@@ -92,7 +95,7 @@ bool CDVDInputStreamNavigator::Open(const char* strFile, const std::string& cont
   && strncasecmp(strDVDFile + len - 8, "VIDEO_TS", 8) == 0)
     strDVDFile[len - 9] = '\0';
 
-#if defined(__APPLE__) && !defined(__arm__)
+#if defined(TARGET_DARWIN_OSX)
   // if physical DVDs, libdvdnav wants "/dev/rdiskN" device name for OSX,
   // strDVDFile will get realloc'ed and replaced IF this is a physical DVD.
   strDVDFile = Cocoa_MountPoint2DeviceName(strDVDFile);
@@ -265,7 +268,7 @@ int CDVDInputStreamNavigator::ProcessBlock(BYTE* dest_buffer, int* read)
   if (!m_dvdnav) return -1;
 
   int result;
-  int len;
+  int len = 2048;
   int iNavresult = NAVRESULT_NOP;
 
   // m_tempbuffer will be used for anything that isn't a normal data block
@@ -1271,9 +1274,6 @@ int CDVDInputStreamNavigator::ConvertAudioStreamId_ExternalToXBMC(int id)
     // non VTS_DOMAIN, only one stream is available
     return 0;
   }
-
-  CLog::Log(LOGWARNING, "%s - no stream found %d", __FUNCTION__, id);
-  return -1;
 }
 
 int CDVDInputStreamNavigator::ConvertSubtitleStreamId_XBMCToExternal(int id)
@@ -1345,7 +1345,4 @@ int CDVDInputStreamNavigator::ConvertSubtitleStreamId_ExternalToXBMC(int id)
     // non VTS_DOMAIN, only one stream is available
     return 0;
   }
-
-  CLog::Log(LOGWARNING, "%s - no stream found %d", __FUNCTION__, id);
-  return -1;
 }

@@ -50,7 +50,7 @@ public:
   static CStdString URLEncode(const CURL &url);
   static CStdString GetLocalPath(const CStdString &strPath);
   static char FirstDriveFromMask (ULONG unitmask);
-  static int GetDriveStatus(const CStdString &strPath);
+  static int GetDriveStatus(const CStdString &strPath, bool bStatusEx=false);
   static bool PowerManagement(PowerState State);
   static int BatteryLevel();
   static bool XBMCShellExecute(const CStdString &strPath, bool bWaitForScriptExit=false);
@@ -73,6 +73,7 @@ public:
 #endif
   static BOOL IsCurrentUserLocalAdministrator();
   static void GetDrivesByType(VECSOURCES &localDrives, Drive_Types eDriveType=ALL_DRIVES, bool bonlywithmedia=false);
+  static std::string GetFirstOpticalDrive();
   static bool IsAudioCD(const CStdString& strPath);
   static CStdString GetDiskLabel(const CStdString& strPath);
 

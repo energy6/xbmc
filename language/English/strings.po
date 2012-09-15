@@ -2784,7 +2784,21 @@ msgctxt "#798"
 msgid "Internet access"
 msgstr ""
 
-#empty strings from id 799 to 849
+msgctxt "#799"
+msgid "Library Update"
+msgstr ""
+
+#: xbmc/music/windows/GUIWindowMusicBase.cpp
+msgctxt "#800"
+msgid "Music library needs to rescan art from tags"
+msgstr ""
+
+#: xbmc/music/windows/GUIWindowMusicBase.cpp
+msgctxt "#801"
+msgid "Would you like to scan now?"
+msgstr ""
+
+#empty strings from id 802 to 849
 
 msgctxt "#850"
 msgid "Invalid port number entered"
@@ -3144,39 +3158,7 @@ msgctxt "#1235"
 msgid "Programs & pictures & video"
 msgstr ""
 
-#empty strings from id 1236 to 1249
-
-msgctxt "#1250"
-msgid "Auto-detection"
-msgstr ""
-
-msgctxt "#1251"
-msgid "Auto-detect system"
-msgstr ""
-
-msgctxt "#1252"
-msgid "Nickname"
-msgstr ""
-
-#empty string with id 1253
-
-msgctxt "#1254"
-msgid "Ask to connect"
-msgstr ""
-
-msgctxt "#1255"
-msgid "Send FTP user and password"
-msgstr ""
-
-msgctxt "#1256"
-msgid "Ping interval"
-msgstr ""
-
-msgctxt "#1257"
-msgid "Would you like to connect to the auto-detected system?"
-msgstr ""
-
-#empty string with id 1258
+#empty strings from id 1236 to 1258
 
 msgctxt "#1259"
 msgid "Zeroconf"
@@ -6318,9 +6300,7 @@ msgctxt "#19065"
 msgid "Default EPG window"
 msgstr ""
 
-msgctxt "#19066"
-msgid "Loading recordings from clients"
-msgstr ""
+#empty string with id 19066
 
 msgctxt "#19067"
 msgid "This event is already being recorded."
@@ -6334,9 +6314,7 @@ msgctxt "#19069"
 msgid "EPG"
 msgstr ""
 
-msgctxt "#19070"
-msgid "EPG scan timeout"
-msgstr ""
+#empty string with id 19070
 
 msgctxt "#19071"
 msgid "EPG update interval"
@@ -6450,17 +6428,7 @@ msgctxt "#19098"
 msgid "Warning"
 msgstr ""
 
-msgctxt "#19099"
-msgid "Timer present"
-msgstr ""
-
-msgctxt "#19100"
-msgid "Are you sure you want to delete this channel, including all timers on this channel?"
-msgstr ""
-
-msgctxt "#19101"
-msgid "This channel is currently being used for playback."
-msgstr ""
+#empty strings from id 19099 to 19100
 
 msgctxt "#19102"
 msgid "Please switch to another channel."
@@ -6474,9 +6442,7 @@ msgctxt "#19104"
 msgid "Enter the name of the folder for the recording"
 msgstr ""
 
-msgctxt "#19105"
-msgid "Size:"
-msgstr ""
+#empty string with id 19105
 
 msgctxt "#19106"			
 msgid "Next timer on"
@@ -6486,9 +6452,7 @@ msgctxt "#19107"
 msgid "at"
 msgstr ""
 
-msgctxt "#19108"
-msgid "Recordings not in sync. Check the log for details."
-msgstr ""
+#empty string with id 19108
 
 msgctxt "#19109"
 msgid "Couldn't save timer. Check the log for details."
@@ -6502,13 +6466,7 @@ msgctxt "#19111"
 msgid "PVR backend error. Check the log for details."
 msgstr ""
 
-msgctxt "#19112"
-msgid "Timers not in sync. Check the log for details."
-msgstr ""
-
-msgctxt "#19113"
-msgid "Next"
-msgstr ""
+#empty strings from id 19112 to 19113
 
 msgctxt "#19114"
 msgid "Version"
@@ -6991,19 +6949,19 @@ msgid "PVR manager is starting up"
 msgstr ""
 
 msgctxt "#19236"
-msgid "importing channels"
+msgid "Loading channels from clients"
 msgstr ""
 
 msgctxt "#19237"
-msgid "importing timers"
+msgid "Loading timers from clients"
 msgstr ""
 
 msgctxt "#19238"
-msgid "importing recordings"
+msgid "Loading recordings from clients"
 msgstr ""
 
 msgctxt "#19239"
-msgid "starting background threads"
+msgid "Starting background threads"
 msgstr ""
 
 msgctxt "#19240"
@@ -7073,6 +7031,80 @@ msgstr ""
 msgctxt "#19256"
 msgid "Stop recording"
 msgstr ""
+
+msgctxt "#19257"
+msgid "Lock channel"
+msgstr ""
+
+msgctxt "#19258"
+msgid "Unlock channel"
+msgstr ""
+
+msgctxt "#19259"
+msgid "Parental control"
+msgstr ""
+
+msgctxt "#19260"
+msgid "Unlock duration"
+msgstr ""
+
+msgctxt "#19261"
+msgid "Change PIN"
+msgstr ""
+
+msgctxt "#19262"
+msgid "Parental control. Enter PIN:"
+msgstr ""
+
+msgctxt "#19263"
+msgid "Locked channel. Enter PIN:"
+msgstr ""
+
+msgctxt "#19264"
+msgid "Incorrect PIN"
+msgstr ""
+
+msgctxt "#19265"
+msgid "The entered PIN number was incorrect."
+msgstr ""
+
+msgctxt "#19266"
+msgid "Parental locked"
+msgstr ""
+
+msgctxt "#19267"
+msgid "Parental locked:"
+msgstr ""
+
+msgctxt "#19268"
+msgid "Do not show 'no information available' labels"
+msgstr ""
+
+msgctxt "#19269"
+msgid "Do not show 'connection lost' warnings"
+msgstr ""
+
+msgctxt "#19270"
+msgid "* All recordings"
+msgstr ""
+
+msgctxt "#19271"
+msgid "No PVR add-ons could be found"
+msgstr ""
+
+msgctxt "#19272"
+msgid "You need a tuner, backend software, and an"
+msgstr ""
+
+msgctxt "#19273"
+msgid "add-on for the backend to be able to use PVR."
+msgstr ""
+
+msgctxt "#19274"
+msgid "Please visit xbmc.org/PVR to learn more."
+msgstr ""
+
+#empty strings from id 19275 to 19499
 
 msgctxt "#19499"
 msgid "Other/Unknown"
@@ -8199,7 +8231,29 @@ msgid "Downloading artist info failed"
 msgstr ""
 
 #string id's 20200 thru 20211 are reserved for speedstrings (LocalizeStrings.cpp)
-#empty strings from id 20200 to 20249
+#empty strings from id 20200 to 20239
+
+msgctxt "#20240"
+msgid "Android music"
+msgstr ""
+
+msgctxt "#20241"
+msgid "Android videos"
+msgstr ""
+
+msgctxt "#20242"
+msgid "Android pictures"
+msgstr ""
+
+msgctxt "#20243"
+msgid "Android photos"
+msgstr ""
+
+msgctxt "#20244"
+msgid "Android Apps"
+msgstr ""
+
+#empty strings from id 20245 to 20249
 
 msgctxt "#20250"
 msgid "Party on! (videos)"
@@ -8847,8 +8901,32 @@ msgctxt "#20458"
 msgid "Group movies in sets"
 msgstr ""
 
+msgctxt "#20459"
+msgid "Tags"
+msgstr ""
+
+msgctxt "#20460"
+msgid "Add %s"
+msgstr ""
+
+msgctxt "#20461"
+msgid "Remove %s"
+msgstr ""
+
+msgctxt "#20462"
+msgid "New tag..."
+msgstr ""
+
+msgctxt "#20463"
+msgid "A tag with the name '%s' already exists."
+msgstr ""
+
+msgctxt "#20464"
+msgid "Select %s"
+msgstr ""
+
 #up to 21329 is reserved for the video db !! !
-#empty strings from id 20459 to 21329
+#empty strings from id 20465 to 21329
 
 msgctxt "#21330"
 msgid "Show hidden files and directories"
@@ -9103,9 +9181,7 @@ msgctxt "#21415"
 msgid "Default music video scraper"
 msgstr ""
 
-msgctxt "#21416"
-msgid "Enable fallback based on scraper language"
-msgstr ""
+#empty string id 21416
 
 msgctxt "#21417"
 msgid "- Settings"
@@ -9263,7 +9339,11 @@ msgctxt "#21455"
 msgid "Cache filled before reaching required amount for continous playback"
 msgstr ""
 
-#empty strings from id 21456 to 21459
+msgctxt "#21456"
+msgid "External storage"
+msgstr ""
+
+#empty strings from id 21457 to 21459
 
 msgctxt "#21460"
 msgid "Subtitle location"
@@ -10147,7 +10227,17 @@ msgctxt "#24101"
 msgid "Would you like to download this Add-on?"
 msgstr ""
 
-#empty strings from id 24102 to 24999
+#: xbmc/Application.cpp
+msgctxt "#24102"
+msgid "Unable to load skin"
+msgstr ""
+
+#: xbmc/Application.cpp
+msgctxt "#24103"
+msgid "Skin is missing some files"
+msgstr ""
+
+#empty strings from id 24104 to 24999
 
 msgctxt "#25000"
 msgid "Notifications"
@@ -10716,7 +10806,13 @@ msgctxt "#35009"
 msgid "Do not use the custom keymap for this device"
 msgstr ""
 
-#empty strings from id 35010 to 35499
+#empty strings from id 35010 to 35099
+
+msgctxt "#35100"
+msgid "Enable joystick and gamepad support"
+msgstr ""
+
+#empty strings from id 35101 to 35499
 
 msgctxt "#35500"
 msgid "Location"
@@ -10783,20 +10879,18 @@ msgstr ""
 #empty string with id 36010
 
 msgctxt "#36011"
-msgid "Could not detect the CEC port. Set it up manually."
+msgid "Could not detect the CEC com port. Set it up manually."
 msgstr ""
 
 msgctxt "#36012"
-msgid "Could not initialise the CEC adapter. Check your settings."
+msgid "Could not initialise the CEC adapter. Please check your settings."
 msgstr ""
 
 msgctxt "#36013"
 msgid "Unsupported libCEC interface version. %d is greater than the version XBMC supports (%d)"
 msgstr ""
 
-msgctxt "#36014"
-msgid "Put this PC in standby mode when the TV is switched off"
-msgstr ""
+#empty string with id 36014
 
 msgctxt "#36015"
 msgid "HDMI port number"
@@ -10808,7 +10902,7 @@ msgid "Connected"
 msgstr ""
 
 msgctxt "#36017"
-msgid "Adapter found, but libCEC is not available"
+msgid "Could not initialise the CEC adapter: libCEC was not found on your system."
 msgstr ""
 
 msgctxt "#36018"
@@ -10843,3 +10937,46 @@ msgctxt "#36025"
 msgid "Send 'inactive source' command when stopping XBMC"
 msgstr ""
 
+msgctxt "#36026"
+msgid "Put devices in standby mode when putting the PC in standby"
+msgstr ""
+
+msgctxt "#36027"
+msgid "This device needs servicing"
+msgstr ""
+
+msgctxt "#36028"
+msgid "Ignore"
+msgstr ""
+
+msgctxt "#36029"
+msgid "When the TV is switched off"
+msgstr ""
+
+msgctxt "#36030"
+msgid "Connection lost"
+msgstr ""
+
+msgctxt "#36031"
+msgid "This user does not have permissions to open the CEC adapter"
+msgstr ""
+
+msgctxt "#36032"
+msgid "The port is busy. Only one program can access the CEC adapter"
+msgstr ""
+
+msgctxt "#36033"
+msgid "Pause playback when switching to another source"
+msgstr ""
+
+#. adjust refreshrate  
+#: xbmc/settings/GUISettings.cpp
+msgctxt "#36035"
+msgid "Always"
+msgstr ""
+
+#. adjust refreshrate  
+#: xbmc/settings/GUISettings.cpp
+msgctxt "#36036"
+msgid "On start/stop"
+msgstr ""

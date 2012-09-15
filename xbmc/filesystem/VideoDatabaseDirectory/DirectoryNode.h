@@ -20,8 +20,8 @@
  *
  */
 
-
 #include "utils/StdString.h"
+#include "utils/UrlOptions.h"
 
 class CFileItemList;
 
@@ -54,7 +54,8 @@ namespace XFILE
       NODE_TYPE_TITLE_MUSICVIDEOS,
       NODE_TYPE_MUSICVIDEOS_ALBUM,
       NODE_TYPE_SETS,
-      NODE_TYPE_COUNTRY
+      NODE_TYPE_COUNTRY,
+      NODE_TYPE_TAGS
     } NODE_TYPE;
 
     typedef struct {
@@ -83,6 +84,7 @@ namespace XFILE
       CDirectoryNode(NODE_TYPE Type, const CStdString& strName, CDirectoryNode* pParent);
       static CDirectoryNode* CreateNode(NODE_TYPE Type, const CStdString& strName, CDirectoryNode* pParent);
 
+      void AddOptions(const CStdString &options);
       void CollectQueryParams(CQueryParams& params) const;
 
       const CStdString& GetName() const;
@@ -100,6 +102,7 @@ namespace XFILE
       NODE_TYPE m_Type;
       CStdString m_strName;
       CDirectoryNode* m_pParent;
+      CUrlOptions m_options;
     };
   }
 }

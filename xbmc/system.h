@@ -81,6 +81,10 @@
   #define HAS_AIRTUNES
 #endif
 
+#ifdef HAVE_MYSQL
+  #define HAS_MYSQL
+#endif
+
 /**********************
  * Non-free Components
  **********************/
@@ -98,7 +102,6 @@
  *****************/
 
 #if defined(TARGET_WINDOWS)
-#define HAS_SDL
 #define HAS_SDL_JOYSTICK
 #define HAS_DVD_DRIVE
 #define HAS_WIN32_NETWORK
@@ -116,9 +119,11 @@
 #define HAS_FILESYSTEM_NFS
 #define HAS_ZEROCONF
 #define HAS_AIRPLAY
+#define HAS_AIRTUNES
 #define HAVE_LIBCEC
 #define HAVE_LIBMP3LAME
 #define HAVE_LIBVORBISENC
+#define HAS_MYSQL
 
 #define DECLARE_UNUSED(a,b) a b;
 #endif
@@ -222,6 +227,11 @@
 #include <sys/types.h>
 #include <errno.h>
 #include "PlatformInclude.h"
+#endif
+
+#if defined(TARGET_ANDROID)
+#undef HAS_LIRC
+#undef HAS_LCD
 #endif
 
 // EGL detected. Dont use GLX!

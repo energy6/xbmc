@@ -51,6 +51,7 @@ CWinSystemX11::CWinSystemX11() : CWinSystemBase()
   m_glWindow = 0;
   m_wmWindow = 0;
   m_bWasFullScreenBeforeMinimize = false;
+  m_minimized = false;
   m_dpyLostTime = 0;
 
   XSetErrorHandler(XErrorHandler);
@@ -132,11 +133,12 @@ bool CWinSystemX11::CreateNewWindow(const CStdString& name, bool fullScreen, RES
   if(!SetFullScreen(fullScreen, res, false))
     return false;
 
-  CTexture iconTexture;
-  iconTexture.LoadFromFile("special://xbmc/media/icon.png");
+  CBaseTexture* iconTexture = CTexture::LoadFromFile("special://xbmc/media/icon.png");
 
-  SDL_WM_SetIcon(SDL_CreateRGBSurfaceFrom(iconTexture.GetPixels(), iconTexture.GetWidth(), iconTexture.GetHeight(), 32, iconTexture.GetPitch(), 0xff0000, 0x00ff00, 0x0000ff, 0xff000000L), NULL);
+  if (iconTexture)
+    SDL_WM_SetIcon(SDL_CreateRGBSurfaceFrom(iconTexture->GetPixels(), iconTexture->GetWidth(), iconTexture->GetHeight(), 32, iconTexture->GetPitch(), 0xff0000, 0x00ff00, 0x0000ff, 0xff000000L), NULL);
   SDL_WM_SetCaption("XBMC Media Center", NULL);
+  delete iconTexture;
 
   // register XRandR Events
 #if defined(HAS_XRANDR)
@@ -440,6 +442,8 @@ void CWinSystemX11::NotifyAppActiveChange(bool bActivated)
 {
   if (bActivated && m_bWasFullScreenBeforeMinimize && !g_graphicsContext.IsFullScreenRoot())
     g_graphicsContext.ToggleFullScreenRoot();
+
+  m_minimized = !bActivated;
 }
 bool CWinSystemX11::Minimize()
 {
@@ -448,6 +452,7 @@ bool CWinSystemX11::Minimize()
     g_graphicsContext.ToggleFullScreenRoot();
 
   SDL_WM_IconifyWindow();
+  m_minimized = true;
   return true;
 }
 bool CWinSystemX11::Restore()
@@ -464,6 +469,7 @@ bool CWinSystemX11::Show(bool raise)
 {
   XMapWindow(m_dpy, m_wmWindow);
   XSync(m_dpy, False);
+  m_minimized = false;
   return true;
 }
 
@@ -544,6 +550,11 @@ int CWinSystemX11::XErrorHandler(Display* dpy, XErrorEvent* error)
             buf, error->type, error->serial, (int)error->error_code, (int)error->request_code, (int)error->minor_code);
 
   return 0;
+}
+
+bool CWinSystemX11::EnableFrameLimiter()
+{
+  return m_minimized;
 }
 
 #endif

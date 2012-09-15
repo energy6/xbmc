@@ -21,6 +21,7 @@
 
 #include "pyutil.h"
 #include "Application.h"
+#include "ApplicationMessenger.h"
 #include "GUIInfoManager.h"
 #include "PlayListPlayer.h"
 #include "player.h"
@@ -139,7 +140,7 @@ namespace PYXBMC
       }
 
       CPyThreadState pyState;
-      g_application.getApplicationMessenger().PlayListPlayerPlay(g_playlistPlayer.GetCurrentSong());
+      CApplicationMessenger::Get().PlayListPlayerPlay(g_playlistPlayer.GetCurrentSong());
     }
     else if ((PyString_Check(pObject) || PyUnicode_Check(pObject)) && pObjectListItem != NULL && ListItem_CheckExact(pObjectListItem))
     {
@@ -151,14 +152,14 @@ namespace PYXBMC
       pListItem->item->SetPath(PyString_AsString(pObject));
 
       CPyThreadState pyState;
-      g_application.getApplicationMessenger().PlayFile((const CFileItem)*pListItem->item, false);
+      CApplicationMessenger::Get().PlayFile((const CFileItem)*pListItem->item, false);
     }
     else if (PyString_Check(pObject) || PyUnicode_Check(pObject))
     {
       CFileItem item(PyString_AsString(pObject), false);
       
       CPyThreadState pyState;
-      g_application.getApplicationMessenger().MediaPlay(item.GetPath());
+      CApplicationMessenger::Get().MediaPlay(item.GetPath());
     }
     else if (PlayList_Check(pObject))
     {
@@ -168,7 +169,7 @@ namespace PYXBMC
       g_playlistPlayer.SetCurrentPlaylist(pPlayList->iPlayList);
 
       CPyThreadState pyState;
-      g_application.getApplicationMessenger().PlayListPlayerPlay();
+      CApplicationMessenger::Get().PlayListPlayerPlay();
     }
 
     Py_INCREF(Py_None);
@@ -182,7 +183,7 @@ namespace PYXBMC
   PyObject* pyPlayer_Stop(PyObject *self, PyObject *args)
   {
     CPyThreadState pyState;
-    g_application.getApplicationMessenger().MediaStop();
+    CApplicationMessenger::Get().MediaStop();
     pyState.Restore();
 
     Py_INCREF(Py_None);
@@ -196,7 +197,7 @@ namespace PYXBMC
   PyObject* Player_Pause(PyObject *self, PyObject *args)
   {
     CPyThreadState pyState;
-    g_application.getApplicationMessenger().MediaPause();
+    CApplicationMessenger::Get().MediaPause();
     pyState.Restore();
 
     Py_INCREF(Py_None);
@@ -213,7 +214,7 @@ namespace PYXBMC
     g_application.m_eForcedNextPlayer = self->playerCore;
 
     CPyThreadState pyState;
-    g_application.getApplicationMessenger().PlayListPlayerNext();
+    CApplicationMessenger::Get().PlayListPlayerNext();
     pyState.Restore();
 
     Py_INCREF(Py_None);
@@ -230,7 +231,7 @@ namespace PYXBMC
     g_application.m_eForcedNextPlayer = self->playerCore;
 
     CPyThreadState pyState;
-    g_application.getApplicationMessenger().PlayListPlayerPrevious();
+    CApplicationMessenger::Get().PlayListPlayerPrevious();
     pyState.Restore();
 
     Py_INCREF(Py_None);
@@ -256,7 +257,7 @@ namespace PYXBMC
     g_playlistPlayer.SetCurrentSong(iItem);
 
     CPyThreadState pyState;
-    g_application.getApplicationMessenger().PlayListPlayerPlay(iItem);
+    CApplicationMessenger::Get().PlayListPlayerPlay(iItem);
     pyState.Restore();
 
     //g_playlistPlayer.Play(iItem);
@@ -321,6 +322,63 @@ namespace PYXBMC
     "Will be called when user resumes a paused file");
 
   PyObject* Player_OnPlayBackResumed(PyObject *self, PyObject *args)
+  {
+    Py_INCREF(Py_None);
+    return Py_None;
+  }
+
+  // Player_OnPlayBackSpeedChanged(speed)
+  PyDoc_STRVAR(onPlayBackSpeedChanged__doc__,
+    "onPlayBackSpeedChanged(speed) -- onPlayBackSpeedChanged method.\n"
+    "\n"
+    "speed          : integer - current speed of player.\n"
+    "\n"
+    "*Note, negative speed means player is rewinding, 1 is normal playback speed.\n"
+    "\n"
+    "Will be called when players speed changes. (eg. user FF/RW)");
+
+  PyObject* Player_OnPlayBackSpeedChanged(PyObject *self, PyObject *args)
+  {
+    Py_INCREF(Py_None);
+    return Py_None;
+  }
+
+  // Player_OnPlayBackSeek(time, seekOffset)
+  PyDoc_STRVAR(onPlayBackSeek__doc__,
+    "onPlayBackSeek(time, seekOffset) -- onPlayBackSeek method.\n"
+    "\n"
+    "time           : integer - time to seek to.\n"
+    "seekOffset     : integer - ?.\n"
+    "\n"
+    "Will be called when user seeks to a time");
+
+  PyObject* Player_OnPlayBackSeek(PyObject *self, PyObject *args)
+  {
+    Py_INCREF(Py_None);
+    return Py_None;
+  }
+
+  // Player_OnPlayBackSeekChapter(chapter)
+  PyDoc_STRVAR(onPlayBackSeekChapter__doc__,
+    "onPlayBackSeekChapter(chapter) -- onPlayBackSeekChapter method.\n"
+    "\n"
+    "chapter        : integer - chapter to seek to.\n"
+    "\n"
+    "Will be called when user performs a chapter seek");
+
+  PyObject* Player_OnPlayBackSeekChapter(PyObject *self, PyObject *args)
+  {
+    Py_INCREF(Py_None);
+    return Py_None;
+  }
+
+  // Player_OnQueueNextItem()
+  PyDoc_STRVAR(onQueueNextItem__doc__,
+    "onQueueNextItem() -- onQueueNextItem method.\n"
+    "\n"
+    "Will be called when player requests next item");
+
+  PyObject* Player_OnQueueNextItem(PyObject *self, PyObject *args)
   {
     Py_INCREF(Py_None);
     return Py_None;
@@ -698,6 +756,10 @@ namespace PYXBMC
     {(char*)"onPlayBackStopped", (PyCFunction)Player_OnPlayBackStopped, METH_VARARGS, onPlayBackStopped__doc__},
     {(char*)"onPlayBackPaused", (PyCFunction)Player_OnPlayBackPaused, METH_VARARGS, onPlayBackPaused__doc__},
     {(char*)"onPlayBackResumed", (PyCFunction)Player_OnPlayBackResumed, METH_VARARGS, onPlayBackResumed__doc__},
+    {(char*)"onPlayBackSpeedChanged", (PyCFunction)Player_OnPlayBackSpeedChanged, METH_VARARGS, onPlayBackSpeedChanged__doc__},
+    {(char*)"onPlayBackSeek", (PyCFunction)Player_OnPlayBackSeek, METH_VARARGS, onPlayBackSeek__doc__},
+    {(char*)"onPlayBackSeekChapter", (PyCFunction)Player_OnPlayBackSeekChapter, METH_VARARGS, onPlayBackSeekChapter__doc__},
+    {(char*)"onQueueNextItem", (PyCFunction)Player_OnQueueNextItem, METH_VARARGS, onQueueNextItem__doc__},
     {(char*)"isPlaying", (PyCFunction)Player_IsPlaying, METH_VARARGS, isPlaying__doc__},
     {(char*)"isPlayingAudio", (PyCFunction)Player_IsPlayingAudio, METH_VARARGS, isPlayingAudio__doc__},
     {(char*)"isPlayingVideo", (PyCFunction)Player_IsPlayingVideo, METH_VARARGS, isPlayingVideo__doc__},

@@ -25,17 +25,17 @@
 
 #include "AEFactory.h"
 #include "AEAudioFormat.h"
-#include "AEConvert.h"
-#include "AERemap.h"
-#include "AEUtil.h"
 #include "CoreAudioAE.h"
 #include "Interfaces/AESound.h"
 #include "threads/SingleLock.h"
+#include "cores/AudioEngine/Utils/AEConvert.h"
+#include "cores/AudioEngine/Utils/AERemap.h"
+#include "cores/AudioEngine/Utils/AEUtil.h"
 #include "utils/log.h"
 #include "utils/EndianSwap.h"
 
 /* typecast AE to CCoreAudioAE */
-#define AE (*(CCoreAudioAE*)CAEFactory::AE)
+#define AE (*(CCoreAudioAE*)CAEFactory::GetEngine())
 
 CCoreAudioAESound::CCoreAudioAESound(const std::string &filename) :
   IAESound         (filename),
@@ -102,8 +102,8 @@ float* CCoreAudioAESound::GetSamples()
 void CCoreAudioAESound::ReleaseSamples()
 {
   CSingleLock cs(m_critSection);
-  ASSERT(m_inUse > 0);
-  --m_inUse;
+  if(m_inUse > 0)
+    --m_inUse;
 }
 
 bool CCoreAudioAESound::IsPlaying()

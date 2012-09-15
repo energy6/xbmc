@@ -21,10 +21,13 @@
 
 #include <time.h>
 #include "system.h"
+#ifdef TARGET_ANDROID
+#include "linux/getdelim.h"
+#endif
 #include "PlatformInclude.h"
 #include "LinuxTimezone.h"
 #include "utils/SystemInfo.h"
-#ifdef __APPLE__
+#if defined(TARGET_DARWIN)
 #include "OSXGNUReplacements.h"
 #endif
 #ifdef __FreeBSD__
@@ -155,7 +158,7 @@ vector<CStdString> CLinuxTimezone::GetTimezonesByCountry(const CStdString countr
 
 CStdString CLinuxTimezone::GetCountryByTimezone(const CStdString timezone)
 {
-#ifdef __APPLE__
+#if defined(TARGET_DARWIN)
    return CStdString("?");
 #else
    return m_countryByCode[m_countriesByTimezoneName[timezone]];
@@ -166,7 +169,7 @@ void CLinuxTimezone::SetTimezone(CStdString timezoneName)
 {
   bool use_timezone = false;
   
-#ifndef __APPLE__ 
+#if !defined(TARGET_DARWIN)
   use_timezone = true;
 #else
   if (g_sysinfo.IsAppleTV2())

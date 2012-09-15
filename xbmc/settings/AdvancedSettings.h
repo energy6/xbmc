@@ -29,6 +29,15 @@ class TiXmlElement;
 class DatabaseSettings
 {
 public:
+  void Reset()
+  {
+    type.clear();
+    host.clear();
+    port.clear();
+    user.clear();
+    pass.clear();
+    name.clear();
+  };
   CStdString type;
   CStdString host;
   CStdString port;
@@ -80,6 +89,7 @@ class CAdvancedSettings
     static CAdvancedSettings* getInstance();
 
     void Initialize();
+    bool Initialized() { return m_initialized; };
     void AddSettingsFile(const CStdString &filename);
     bool Load();
     void Clear();
@@ -99,6 +109,7 @@ class CAdvancedSettings
     bool m_audioForceDirectSound;
     bool m_audioAudiophile;
     bool m_allChannelStereo;
+    bool m_streamSilence;
     int m_audioSinkBufferDurationMsec;
     CStdString m_audioTranscodeTo;
     float m_limiterHold;
@@ -166,18 +177,15 @@ class CAdvancedSettings
     int m_lcdScrolldelay;
     CStdString m_lcdHostName;
 
-    int m_autoDetectPingTime;
-
     int m_songInfoDuration;
-    int m_busyDialogDelay;
     int m_logLevel;
     int m_logLevelHint;
     CStdString m_cddbAddress;
-    
+
     //airtunes + airplay
     bool m_logEnableAirtunes;
     int m_airTunesPort;
-    int m_airPlayPort;    
+    int m_airPlayPort;
 
     bool m_handleMounting;
 
@@ -204,8 +212,12 @@ class CAdvancedSettings
     bool m_playlistAsFolders;
     bool m_detectAsUdf;
 
-    int m_thumbSize;
-    int m_fanartHeight;
+    int m_fanartRes; ///< \brief the maximal resolution to cache fanart at (assumes 16x9)
+    int m_imageRes;  ///< \brief the maximal resolution to cache images at (assumes 16x9)
+    /*! \brief the maximal size to cache thumbs at, assuming square
+     Used for actual thumbs (eg bookmark thumbs, picture thumbs) rather than cover art which uses m_imageRes instead
+     */
+    unsigned int GetThumbSize() const { return m_imageRes / 2; };
     bool m_useDDSFanart;
 
     int m_sambaclienttimeout;
@@ -239,8 +251,10 @@ class CAdvancedSettings
     bool m_bVideoLibraryCleanOnUpdate;
     bool m_bVideoLibraryExportAutoThumbs;
     bool m_bVideoLibraryImportWatchedState;
+    bool m_bVideoLibraryImportResumePoint;
 
     bool m_bVideoScannerIgnoreErrors;
+    int m_iVideoLibraryDateAdded;
 
     std::vector<CStdString> m_vecTokens; // cleaning strings tied to language
     //TuxBox
@@ -283,7 +297,7 @@ class CAdvancedSettings
 
     bool m_fullScreen;
     bool m_startFullScreen;
-	bool m_showExitButton; /* Ideal for appliances to hide a 'useless' button */
+    bool m_showExitButton; /* Ideal for appliances to hide a 'useless' button */
     bool m_canWindowed;
     bool m_splashImage;
     bool m_alwaysOnTop;  /* makes xbmc to run always on top .. osx/win32 only .. */
@@ -344,6 +358,9 @@ class CAdvancedSettings
     void ParseSettingsFile(const CStdString &file);
 
     float GetDisplayLatency(float refreshrate);
+    bool m_initialized;
+
+    void SetDebugMode(bool debug);
 };
 
 XBMC_GLOBAL(CAdvancedSettings,g_advancedSettings);

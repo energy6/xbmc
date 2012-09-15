@@ -74,7 +74,8 @@ bool CDirectoryNodeOverview::GetContent(CFileItemList& items) const
   bool showSingles = false;
   if (musicDatabase.Open())
   {
-    if (musicDatabase.GetSongsCount("where idAlbum in (select idAlbum from album where strAlbum='')") > 0)
+    CDatabase::Filter filter("idAlbum IN (SELECT idAlbum FROM album WHERE strAlbum = '')");
+    if (musicDatabase.GetSongsCount(filter) > 0)
       showSingles = true;
   }
 
@@ -82,7 +83,7 @@ bool CDirectoryNodeOverview::GetContent(CFileItemList& items) const
   {
     if (i == 3 && !showSingles) // singles
       continue;
-    if (i == 9 && musicDatabase.GetVariousArtistsAlbumsCount() == 0) // compilations
+    if (i == 9 && musicDatabase.GetCompilationAlbumsCount() == 0) // compilations
       continue;
 
     CFileItemPtr pItem(new CFileItem(g_localizeStrings.Get(OverviewChildren[i].label)));

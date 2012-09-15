@@ -27,7 +27,7 @@
 #include "URL.h"
 #include "filesystem/File.h"
 #include "filesystem/CurlFile.h"
-#ifdef __APPLE__
+#if defined(TARGET_DARWIN)
 #include "CocoaInterface.h"
 #endif
 #include "settings/Settings.h"
@@ -50,6 +50,8 @@ CRssReader::CRssReader() : CThread("CRssReader")
   m_spacesBetweenFeeds = 0;
   m_bIsRunning = false;
   m_SavedScrollPos = 0;
+  m_rtlText = false;
+  m_requestRefresh = false;
 }
 
 CRssReader::~CRssReader()

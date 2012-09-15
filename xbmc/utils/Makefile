@@ -3,14 +3,16 @@ SRCS=AlarmClock.cpp \
      Archive.cpp \
      AsyncFileCopy.cpp \
      AutoPtrHandle.cpp \
-		 Base64.cpp \
+     Base64.cpp \
      BitstreamStats.cpp \
      CharsetConverter.cpp \
      CPUInfo.cpp \
      Crc32.cpp \
      CryptThreading.cpp \
+     DatabaseUtils.cpp \
      DownloadQueue.cpp \
      DownloadQueueManager.cpp \
+     EndianSwap.cpp \
      Fanart.cpp \
      fastmemcpy.c \
      fastmemcpy-arm.S \
@@ -23,7 +25,7 @@ SRCS=AlarmClock.cpp \
      HTMLUtil.cpp \
      HttpHeader.cpp \
      HttpParser.cpp \
-		 HttpResponse.cpp \
+     HttpResponse.cpp \
      InfoLoader.cpp \
      JobManager.cpp \
      JSONVariantParser.cpp \
@@ -45,8 +47,9 @@ SRCS=AlarmClock.cpp \
      RssReader.cpp \
      ScraperParser.cpp \
      ScraperUrl.cpp \
+     SeekHandler.cpp \
+     SortUtils.cpp \
      Splash.cpp \
-     ssrc.cpp \
      Stopwatch.cpp \
      StreamDetails.cpp \
      StreamUtils.cpp \
@@ -57,9 +60,10 @@ SRCS=AlarmClock.cpp \
      TimeUtils.cpp \
      TuxBoxUtil.cpp \
      URIUtils.cpp \
+     UrlOptions.cpp \
      Variant.cpp \
+     Vector.cpp \
      Weather.cpp \
-     Win32Exception.cpp \
      XBMCTinyXML.cpp \
      XMLUtils.cpp \
 

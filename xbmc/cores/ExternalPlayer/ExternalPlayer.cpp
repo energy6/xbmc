@@ -37,6 +37,7 @@
 #include "utils/XMLUtils.h"
 #include "utils/TimeUtils.h"
 #include "utils/log.h"
+#include "cores/AudioEngine/AEFactory.h"
 #if defined(_WIN32)
   #include "Windows.h"
   #ifdef HAS_IRSERVERSUITE
@@ -151,7 +152,7 @@ void CExternalPlayer::Process()
       mainFile = CMusicDatabaseFile::TranslateUrl(url);
   }
 
-  if (m_filenameReplacers.size() > 0) 
+  if (m_filenameReplacers.size() > 0)
   {
     for (unsigned int i = 0; i < m_filenameReplacers.size(); i++)
     {
@@ -173,7 +174,7 @@ void CExternalPlayer::Process()
         continue;
       }
 
-      if (regExp.RegFind(mainFile) > -1) 
+      if (regExp.RegFind(mainFile) > -1)
       {
         CStdString strPat = vecSplit[1];
         strPat.Replace(",,",",");
@@ -287,10 +288,19 @@ void CExternalPlayer::Process()
 #endif
 
   m_playbackStartTime = XbmcThreads::SystemClockMillis();
+
+  /* Suspend AE temporarily so exclusive or hog-mode sinks */
+  /* don't block external player's access to audio device  */
+  if (!CAEFactory::Suspend())
+  {
+    CLog::Log(LOGNOTICE, __FUNCTION__, "Failed to suspend AudioEngine before launching external player");
+  }
+
+
   BOOL ret = TRUE;
 #if defined(_WIN32)
   ret = ExecuteAppW32(strFName.c_str(),strFArgs.c_str());
-#elif defined(_LINUX)
+#elif defined(_LINUX) || defined(TARGET_DARWIN_OSX)
   ret = ExecuteAppLinux(strFArgs.c_str());
 #endif
   int64_t elapsedMillis = XbmcThreads::SystemClockMillis() - m_playbackStartTime;
@@ -349,6 +359,12 @@ void CExternalPlayer::Process()
   }
 #endif
 
+  /* Resume AE processing of XBMC native audio */
+  if (!CAEFactory::Resume())
+  {
+    CLog::Log(LOGFATAL, __FUNCTION__, "Failed to restart AudioEngine after return from external player");
+  }
+
   // We don't want to come back to an active screensaver
   g_application.ResetScreenSaver();
   g_application.WakeUpScreenSaverAndDPMS();
@@ -377,12 +393,12 @@ BOOL CExternalPlayer::ExecuteAppW32(const char* strPath, const char* strSwitches
   if (m_bAbortRequest) return false;
 
   BOOL ret = CreateProcessW(WstrPath.IsEmpty() ? NULL : WstrPath.c_str(),
-                            (LPWSTR) WstrSwitches.c_str(), NULL, NULL, FALSE, NULL, 
+                            (LPWSTR) WstrSwitches.c_str(), NULL, NULL, FALSE, NULL,
                             NULL, NULL, &si, &m_processInfo);
 
   if (ret == FALSE)
   {
-    DWORD lastError = GetLastError(); 
+    DWORD lastError = GetLastError();
     CLog::Log(LOGNOTICE, "%s - Failure: %d", __FUNCTION__, lastError);
   }
   else
@@ -416,7 +432,7 @@ BOOL CExternalPlayer::ExecuteAppW32(const char* strPath, const char* strSwitches
 }
 #endif
 
-#if defined(_LINUX)
+#if defined(_LINUX) || defined(TARGET_DARWIN_OSX)
 BOOL CExternalPlayer::ExecuteAppLinux(const char* strSwitches)
 {
   CLog::Log(LOGNOTICE, "%s: %s", __FUNCTION__, strSwitches);
@@ -504,7 +520,7 @@ void CExternalPlayer::SeekPercentage(float iPercent)
 float CExternalPlayer::GetPercentage()
 {
   int64_t iTime = GetTime();
-  int64_t iTotalTime = GetTotalTime() * 1000;
+  int64_t iTotalTime = GetTotalTime();
 
   if (iTotalTime != 0)
   {
@@ -547,9 +563,9 @@ int64_t CExternalPlayer::GetTime() // in millis
   return m_time;
 }
 
-int CExternalPlayer::GetTotalTime() // in seconds
+int64_t CExternalPlayer::GetTotalTime() // in milliseconds
 {
-  return m_totalTime;
+  return m_totalTime * 1000;
 }
 
 void CExternalPlayer::ToFFRW(int iSpeed)
@@ -573,7 +589,7 @@ bool CExternalPlayer::SetPlayerState(CStdString state)
 
 bool CExternalPlayer::Initialize(TiXmlElement* pConfig)
 {
-  XMLUtils::GetString(pConfig, "filename", m_filename); 
+  XMLUtils::GetString(pConfig, "filename", m_filename);
   if (m_filename.length() > 0)
   {
     CLog::Log(LOGNOTICE, "ExternalPlayer Filename: %s", m_filename.c_str());
@@ -619,7 +635,7 @@ bool CExternalPlayer::Initialize(TiXmlElement* pConfig)
 
   XMLUtils::GetInt(pConfig, "playcountminimumtime", m_playCountMinTime, 1, INT_MAX);
 
-  CLog::Log(LOGNOTICE, "ExternalPlayer Tweaks: hideconsole (%s), hidexbmc (%s), islauncher (%s), warpcursor (%s)", 
+  CLog::Log(LOGNOTICE, "ExternalPlayer Tweaks: hideconsole (%s), hidexbmc (%s), islauncher (%s), warpcursor (%s)",
           m_hideconsole ? "true" : "false",
           m_hidexbmc ? "true" : "false",
           m_islauncher ? "true" : "false",

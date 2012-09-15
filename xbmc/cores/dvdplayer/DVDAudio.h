@@ -27,7 +27,8 @@
 #include "threads/CriticalSection.h"
 #include "PlatformDefs.h"
 
-#include "cores/AudioEngine/Interfaces/AEStream.h"
+#include "cores/AudioEngine/Utils/AEChannelInfo.h"
+class IAEStream;
 
 #ifndef _LINUX
 enum CodecID;
@@ -47,12 +48,16 @@ extern "C" {
 typedef struct stDVDAudioFrame DVDAudioFrame;
 
 class CSingleLock;
+class IAudioCallback;
 
 class CDVDAudio
 {
 public:
   CDVDAudio(volatile bool& bStop);
   ~CDVDAudio();
+
+  void RegisterAudioCallback(IAudioCallback* pCallback);
+  void UnRegisterAudioCallback();
 
   void SetVolume(float fVolume);
   void SetDynamicRangeCompression(long drc);
@@ -89,6 +94,7 @@ protected:
   bool m_bPaused;
 
   volatile bool& m_bStop;
+  IAudioCallback* m_pAudioCallback; //the viz audio callback
   //counter that will go from 0 to m_iSpeed-1 and reset, data will only be output when speedstep is 0
   //int m_iSpeedStep;
 };

@@ -35,6 +35,12 @@
 #include "utils/XBMCTinyXML.h"
 #include "XBIRRemote.h"
 
+#if defined(TARGET_WINDOWS)
+#include "input/windows/WINJoystick.h"
+#elif defined(HAS_SDL_JOYSTICK) || defined(HAS_EVENT_SERVER)
+#include "SDLJoystick.h"
+#endif
+
 using namespace std;
 using namespace XFILE;
 
@@ -92,7 +98,8 @@ static const ActionMapping actions[] =
         {"nextcalibration"   , ACTION_CALIBRATE_SWAP_ARROWS},
         {"resetcalibration"  , ACTION_CALIBRATE_RESET},
         {"analogmove"        , ACTION_ANALOG_MOVE},
-        {"rotate"            , ACTION_ROTATE_PICTURE},
+        {"rotate"            , ACTION_ROTATE_PICTURE_CW},
+        {"rotateccw"         , ACTION_ROTATE_PICTURE_CCW},
         {"close"             , ACTION_NAV_BACK}, // backwards compatibility
         {"subtitledelayminus", ACTION_SUBTITLE_DELAY_MIN},
         {"subtitledelay"     , ACTION_SUBTITLE_DELAY},
@@ -461,7 +468,7 @@ bool CButtonTranslator::Load(bool AlwaysLoad)
       CFileItemList files;
       XFILE::CDirectory::GetDirectory(DIRS_TO_CHECK[dirIndex], files, ".xml");
       // Sort the list for filesystem based priorities, e.g. 01-keymap.xml, 02-keymap-overrides.xml
-      files.Sort(SORT_METHOD_FILE, SORT_ORDER_ASC);
+      files.Sort(SORT_METHOD_FILE, SortOrderAscending);
       for(int fileIndex = 0; fileIndex<files.Size(); ++fileIndex)
       {
         if (!files[fileIndex]->m_bIsFolder)
@@ -480,7 +487,7 @@ bool CButtonTranslator::Load(bool AlwaysLoad)
           CFileItemList files;
           XFILE::CDirectory::GetDirectory(devicedir, files, ".xml");
           // Sort the list for filesystem based priorities, e.g. 01-keymap.xml, 02-keymap-overrides.xml
-          files.Sort(SORT_METHOD_FILE, SORT_ORDER_ASC);
+          files.Sort(SORT_METHOD_FILE, SortOrderAscending);
           for(int fileIndex = 0; fileIndex<files.Size(); ++fileIndex)
           {
             if (!files[fileIndex]->m_bIsFolder)
@@ -861,6 +868,15 @@ bool CButtonTranslator::TranslateJoystickString(int window, const char* szDevice
   return false;
 }
 #endif
+
+void CButtonTranslator::GetActions(std::vector<std::string> &actionList)
+{
+  unsigned int size = sizeof(actions) / sizeof(ActionMapping);
+  actionList.clear();
+  actionList.reserve(size);
+  for (unsigned int index = 0; index < size; index++)
+    actionList.push_back(actions[index].name);
+}
 
 CAction CButtonTranslator::GetAction(int window, const CKey &key, bool fallback)
 {

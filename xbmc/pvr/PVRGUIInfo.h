@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -45,7 +45,7 @@ namespace PVR
     void Start(void);
     void Stop(void);
 
-    void Notify(const Observable &obs, const CStdString& msg);
+    void Notify(const Observable &obs, const ObservableMessage msg);
 
     bool TranslateBoolInfo(DWORD dwInfo) const;
     bool TranslateCharInfo(DWORD dwInfo, CStdString &strValue) const;

@@ -31,7 +31,6 @@
 #include "settings/AdvancedSettings.h"
 #include "utils/log.h"
 #include "utils/XBMCTinyXML.h"
-#include "dialogs/GUIDialogYesNo.h"
 #ifdef HAS_VISUALISATION
 #include "Visualisation.h"
 #endif
@@ -51,6 +50,7 @@
 #include "Service.h"
 #include "pvr/PVRManager.h"
 #include "pvr/addons/PVRClients.h"
+#include "Util.h"
 
 using namespace std;
 using namespace PVR;
@@ -124,7 +124,16 @@ AddonPtr CAddonMgr::Factory(const cp_extension_t *props)
         { // built in screensaver
           return AddonPtr(new CAddon(props));
         }
-#if defined(_LINUX) && !defined(__APPLE__)
+        if (type == ADDON_SCREENSAVER)
+        { // Python screensaver
+          CStdString library = CAddonMgr::Get().GetExtValue(props->configuration, "@library");
+          if (URIUtils::GetExtension(library).Equals(".py", false))
+            return AddonPtr(new CScreenSaver(props));
+        }
+#if defined(TARGET_ANDROID)                                                                                                                                                      
+          if ((value = GetExtValue(props->plugin->extensions->configuration, "@library_android")) && value.empty())                                                                
+            break;                                                                                                                                                                 
+ #elif defined(_LINUX) && !defined(TARGET_DARWIN)
         if ((value = GetExtValue(props->plugin->extensions->configuration, "@library_linux")) && value.empty())
           break;
 #elif defined(_WIN32) && defined(HAS_SDL_OPENGL)
@@ -133,7 +142,7 @@ AddonPtr CAddonMgr::Factory(const cp_extension_t *props)
 #elif defined(_WIN32) && defined(HAS_DX)
         if ((value = GetExtValue(props->plugin->extensions->configuration, "@library_windx")) && value.empty())
           break;
-#elif defined(__APPLE__)
+#elif defined(TARGET_DARWIN)
         if ((value = GetExtValue(props->plugin->extensions->configuration, "@library_osx")) && value.empty())
           break;
 #endif
@@ -299,14 +308,14 @@ bool CAddonMgr::HasAddons(const TYPE &type, bool enabled /*= true*/)
   return GetAddons(type, addons, enabled);
 }
 
-bool CAddonMgr::GetAllAddons(VECADDONS &addons, bool enabled /*= true*/, bool allowRepos /* = false */, bool bGetDisabledPVRAddons /* = true */)
+bool CAddonMgr::GetAllAddons(VECADDONS &addons, bool enabled /*= true*/, bool allowRepos /* = false */)
 {
   for (int i = ADDON_UNKNOWN+1; i < ADDON_VIZ_LIBRARY; ++i)
   {
     if (!allowRepos && ADDON_REPOSITORY == (TYPE)i)
       continue;
     VECADDONS temp;
-    if (CAddonMgr::Get().GetAddons((TYPE)i, temp, enabled, bGetDisabledPVRAddons))
+    if (CAddonMgr::Get().GetAddons((TYPE)i, temp, enabled))
       addons.insert(addons.end(), temp.begin(), temp.end());
   }
   return !addons.empty();
@@ -385,9 +394,8 @@ bool CAddonMgr::HasOutdatedAddons(bool enabled /*= true*/)
   return GetAllOutdatedAddons(dummy,enabled);
 }
 
-bool CAddonMgr::GetAddons(const TYPE &type, VECADDONS &addons, bool enabled /* = true */, bool bGetDisabledPVRAddons /* = true */)
+bool CAddonMgr::GetAddons(const TYPE &type, VECADDONS &addons, bool enabled /* = true */)
 {
-  CStdString xbmcPath = CSpecialProtocol::TranslatePath("special://xbmc/addons");
   CSingleLock lock(m_critSection);
   addons.clear();
   cp_status_t status;
@@ -397,11 +405,12 @@ bool CAddonMgr::GetAddons(const TYPE &type, VECADDONS &addons, bool enabled /* =
   for(int i=0; i <num; i++)
   {
     const cp_extension_t *props = exts[i];
-    bool bIsPVRAddon(TranslateType(props->ext_point_id) == ADDON_PVRDLL);
-
-    if (((bGetDisabledPVRAddons && bIsPVRAddon) || m_database.IsAddonDisabled(props->plugin->identifier) != enabled))
+    if (m_database.IsAddonDisabled(props->plugin->identifier) != enabled)
     {
-      if (bIsPVRAddon && g_PVRManager.IsStarted())
+      // get a pointer to a running pvrclient if it's already started, or we won't be able to change settings
+      if (TranslateType(props->ext_point_id) == ADDON_PVRDLL &&
+          enabled &&
+          g_PVRManager.IsStarted())
       {
         AddonPtr pvrAddon;
         if (g_PVRClients->GetClient(props->plugin->identifier, pvrAddon))
@@ -424,7 +433,6 @@ bool CAddonMgr::GetAddon(const CStdString &str, AddonPtr &addon, const TYPE &typ
 {
   CSingleLock lock(m_critSection);
 
-  CStdString xbmcPath = CSpecialProtocol::TranslatePath("special://xbmc/addons");
   cp_status_t status;
   cp_plugin_info_t *cpaddon = m_cpluff->get_plugin_info(m_cp_context, str.c_str(), &status);
   if (status == CP_OK && cpaddon)
@@ -539,7 +547,7 @@ void CAddonMgr::FindAddons()
       SetChanged();
     }
   }
-  NotifyObservers("addons");
+  NotifyObservers(ObservableMessageAddons);
 }
 
 void CAddonMgr::RemoveAddon(const CStdString& ID)
@@ -548,7 +556,7 @@ void CAddonMgr::RemoveAddon(const CStdString& ID)
   {
     m_cpluff->uninstall_plugin(m_cp_context,ID.c_str());
     SetChanged();
-    NotifyObservers("addons");
+    NotifyObservers(ObservableMessageAddons);
   }
 }
 
@@ -635,7 +643,9 @@ bool CAddonMgr::PlatformSupportsAddon(const cp_plugin_info_t *plugin) const
     {
       if (platforms[i] == "all")
         return true;
-#if defined(_LINUX) && !defined(__APPLE__)
+#if defined(TARGET_ANDROID)
+      if (platforms[i] == "android")
+#elif defined(_LINUX) && !defined(TARGET_DARWIN)
       if (platforms[i] == "linux")
 #elif defined(_WIN32) && defined(HAS_SDL_OPENGL)
       if (platforms[i] == "wingl")

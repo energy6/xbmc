@@ -28,15 +28,12 @@
 
 #include "AEFactory.h"
 #include "AEAudioFormat.h"
-#include "Utils/AEConvert.h"
-#include "Utils/AERemap.h"
-#include "Utils/AEUtil.h"
 
 #include "SoftAE.h"
 #include "SoftAESound.h"
 
 /* typecast AE to CSoftAE */
-#define AE (*((CSoftAE*)CAEFactory::AE))
+#define AE (*((CSoftAE*)CAEFactory::GetEngine()))
 
 typedef struct
 {

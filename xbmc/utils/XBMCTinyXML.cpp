@@ -30,20 +30,18 @@ CXBMCTinyXML::CXBMCTinyXML()
 }
 
 CXBMCTinyXML::CXBMCTinyXML(const char *documentName)
-: TiXmlDocument()
+: TiXmlDocument(documentName)
 {
-  LoadFile(documentName);
 }
 
 CXBMCTinyXML::CXBMCTinyXML(const CStdString &documentName)
-: TiXmlDocument()
+: TiXmlDocument(documentName)
 {
-  LoadFile(documentName);
 }
 
 bool CXBMCTinyXML::LoadFile(TiXmlEncoding encoding)
 {
-  return TiXmlDocument::LoadFile(encoding);
+  return LoadFile(value, encoding);
 }
 
 bool CXBMCTinyXML::LoadFile(const char *_filename, TiXmlEncoding encoding)
@@ -91,12 +89,9 @@ bool CXBMCTinyXML::LoadFile(FILE *f, TiXmlEncoding encoding)
 {
   CStdString data("");
   char buf[BUFFER_SIZE];
-  int result, count = 0;
+  int result;
   while ((result = fread(buf, 1, BUFFER_SIZE, f)) > 0)
-  {
-    data.reserve(BUFFER_SIZE * (++count));
-    data.append(buf);
-  }
+    data.append(buf, result);
   return Parse(data, NULL, encoding) != NULL;
 }
 

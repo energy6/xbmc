@@ -23,9 +23,11 @@
 #include <string>
 #include <set>
 
-#include "mysqldataset.h"
 #include "utils/log.h"
 #include "system.h" // for GetLastError()
+
+#ifdef HAS_MYSQL
+#include "mysqldataset.h"
 #include "mysql/errmsg.h"
 #ifdef _WIN32
 #pragma comment(lib, "mysqlclient.lib")
@@ -458,7 +460,7 @@ string MysqlDatabase::vprepare(const char *format, va_list args)
 
 #define etINVALID     0 /* Any unrecognized conversion type */
 
-#define ARRAYSIZE(X)    ((int)(sizeof(X)/sizeof(X[0])))
+#define ARRAY_SIZE(X)    ((int)(sizeof(X)/sizeof(X[0])))
 
 /*
 ** An "etByte" is an 8-bit unsigned value.
@@ -730,7 +732,7 @@ void MysqlDatabase::mysqlVXPrintf(
     /* Fetch the info entry for the field */
     infop = &fmtinfo[0];
     xtype = etINVALID;
-    for(idx=0; idx<ARRAYSIZE(fmtinfo); idx++){
+    for(idx=0; idx<ARRAY_SIZE(fmtinfo); idx++){
       if( c==fmtinfo[idx].fmttype ){
         infop = &fmtinfo[idx];
         if( useExtended || (infop->flags & FLAG_INTERN)==0 ){
@@ -1597,4 +1599,5 @@ void MysqlDataset::interrupt() {
 }
 
 }//namespace
+#endif //HAS_MYSQL
 

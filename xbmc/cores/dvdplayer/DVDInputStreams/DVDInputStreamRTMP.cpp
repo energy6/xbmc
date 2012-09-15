@@ -29,7 +29,6 @@
 #ifdef HAS_LIBRTMP
 #include "settings/AdvancedSettings.h"
 #include "DVDInputStreamRTMP.h"
-#include "filesystem/IFile.h"
 #include "threads/SingleLock.h"
 #include "utils/log.h"
 #include "utils/Variant.h"
@@ -91,6 +90,7 @@ CDVDInputStreamRTMP::CDVDInputStreamRTMP() : CDVDInputStream(DVDSTREAM_TYPE_RTMP
   m_eof = true;
   m_bPaused = false;
   m_sStreamPlaying = NULL;
+  m_rtmp = NULL;
 }
 
 CDVDInputStreamRTMP::~CDVDInputStreamRTMP()

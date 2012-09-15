@@ -31,10 +31,32 @@ namespace dbiplus {
 #include <memory>
 
 class DatabaseSettings; // forward
+class CDbUrl;
 
 class CDatabase
 {
 public:
+  class Filter
+  {
+  public:
+    Filter() : fields("*") {};
+    Filter(const char *w) : fields("*"), where(w) {};
+    Filter(const std::string &w) : fields("*"), where(w) {};
+    
+    void AppendField(const std::string &strField);
+    void AppendJoin(const std::string &strJoin);
+    void AppendWhere(const std::string &strWhere, bool combineWithAnd = true);
+    void AppendOrder(const std::string &strOrder);
+    void AppendGroup(const std::string &strGroup);
+
+    std::string fields;
+    std::string join;
+    std::string where;
+    std::string order;
+    std::string group;
+    std::string limit;
+  };
+
   CDatabase(void);
   virtual ~CDatabase(void);
   bool IsOpen();
@@ -113,7 +135,13 @@ public:
    */
   bool CommitInsertQueries();
 
+  virtual bool GetFilter(const CDbUrl &dbUrl, Filter &filter) { return true; }
+  virtual bool BuildSQL(const CStdString &strBaseDir, const CStdString &strQuery, Filter &filter, CStdString &strSQL, CDbUrl &dbUrl);
+
 protected:
+  friend class CDatabaseManager;
+  bool Update(const DatabaseSettings &db);
+
   void Split(const CStdString& strFileNameAndPath, CStdString& strPath, CStdString& strFileName);
   uint32_t ComputeCRC(const CStdString &text);
 
@@ -125,7 +153,10 @@ protected:
   virtual int GetMinVersion() const=0;
   virtual const char *GetBaseDBName() const=0;
 
+  int GetDBVersion();
   bool UpdateVersion(const CStdString &dbName);
+
+  bool BuildSQL(const CStdString &strQuery, const Filter &filter, CStdString &strSQL);
 
   bool m_sqlite; ///< \brief whether we use sqlite (defaults to true)
 
@@ -134,7 +165,8 @@ protected:
   std::auto_ptr<dbiplus::Dataset> m_pDS2;
 
 private:
-  bool Connect(const DatabaseSettings &db, bool create);
+  void InitSettings(DatabaseSettings &dbSettings);
+  bool Connect(const CStdString &dbName, const DatabaseSettings &db, bool create);
   bool UpdateVersionNumber();
 
   bool m_bMultiWrite; /*!< True if there are any queries in the queue, false otherwise */

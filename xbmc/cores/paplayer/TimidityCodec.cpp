@@ -20,6 +20,7 @@
  */
 
 #include "TimidityCodec.h"
+#include "URL.h"
 #include "../DllLoader/LibraryLoader.h"
 #include "../DllLoader/SoLoader.h"
 #include "../DllLoader/DllLoader.h"
@@ -39,6 +40,7 @@ TimidityCodec::TimidityCodec()
   m_iTrack = -1;
   m_iDataPos = -1;
   m_loader = NULL;
+  memset(&m_dll, 0, sizeof(m_dll));
 }
 
 TimidityCodec::~TimidityCodec()

@@ -63,6 +63,7 @@ extern "C" {
   void InitAddonTypes(void);
   void DeinitAddonModule(void);
   void InitVFSModule(void);
+  void InitVFSTypes(void);
   void DeinitVFSModule(void);
 }
 
@@ -74,6 +75,8 @@ XBPython::XBPython()
   m_mainThreadState   = NULL;
   m_ThreadId          = CThread::GetCurrentThreadId();
   m_iDllScriptCounter = 0;
+  m_endtime           = 0;
+  m_pDll              = NULL;
   m_vecPlayerCallbackList.clear();
   m_vecMonitorCallbackList.clear();
   CAnnouncementManager::AddAnnouncer(this);
@@ -180,6 +183,66 @@ void XBPython::OnPlayBackStopped()
   }
 }
 
+// message all registered callbacks that playback speed changed (FF/RW)
+void XBPython::OnPlayBackSpeedChanged(int iSpeed)
+{
+  CSingleLock lock(m_critSection);
+  if (m_bInitialized)
+  {
+    PlayerCallbackList::iterator it = m_vecPlayerCallbackList.begin();
+    while (it != m_vecPlayerCallbackList.end())
+    {
+      ((IPlayerCallback*)(*it))->OnPlayBackSpeedChanged(iSpeed);
+      it++;
+    }
+  }
+}
+
+// message all registered callbacks that player is seeking
+void XBPython::OnPlayBackSeek(int iTime, int seekOffset)
+{
+  CSingleLock lock(m_critSection);
+  if (m_bInitialized)
+  {
+    PlayerCallbackList::iterator it = m_vecPlayerCallbackList.begin();
+    while (it != m_vecPlayerCallbackList.end())
+    {
+      ((IPlayerCallback*)(*it))->OnPlayBackSeek(iTime, seekOffset);
+      it++;
+    }
+  }
+}
+
+// message all registered callbacks that player chapter seeked
+void XBPython::OnPlayBackSeekChapter(int iChapter)
+{
+  CSingleLock lock(m_critSection);
+  if (m_bInitialized)
+  {
+    PlayerCallbackList::iterator it = m_vecPlayerCallbackList.begin();
+    while (it != m_vecPlayerCallbackList.end())
+    {
+      ((IPlayerCallback*)(*it))->OnPlayBackSeekChapter(iChapter);
+      it++;
+    }
+  }
+}
+
+// message all registered callbacks that next item has been queued
+void XBPython::OnQueueNextItem()
+{
+  CSingleLock lock(m_critSection);
+  if (m_bInitialized)
+  {
+    PlayerCallbackList::iterator it = m_vecPlayerCallbackList.begin();
+    while (it != m_vecPlayerCallbackList.end())
+    {
+      ((IPlayerCallback*)(*it))->OnQueueNextItem();
+      it++;
+    }
+  }
+}
+
 void XBPython::RegisterPythonPlayerCallBack(IPlayerCallback* pCallback)
 {
   CSingleLock lock(m_critSection);
@@ -273,6 +336,28 @@ void XBPython::OnDatabaseUpdated(const std::string &database)
    it++;
   }
  }  
+} 
+
+void XBPython::OnAbortRequested(const CStdString &ID)
+{
+  CSingleLock lock(m_critSection);
+  if (m_bInitialized)
+  {
+    MonitorCallbackList::iterator it = m_vecMonitorCallbackList.begin();
+    while (it != m_vecMonitorCallbackList.end())
+    {
+      if (ID.IsEmpty())
+      {    
+        ((CPythonMonitor*)(*it))->OnAbortRequested();
+      }
+      else
+      {
+        if (((CPythonMonitor*)(*it))->Id == ID)
+          ((CPythonMonitor*)(*it))->OnAbortRequested();
+      }
+      it++;
+    }
+  }  
 } 
 
 /**
@@ -388,6 +473,7 @@ void XBPython::InitializeInterpreter(ADDON::AddonPtr addon)
   InitGUIModule(); // init xbmcgui modules
   InitAddonModule(); // init xbmcaddon modules
   InitVFSModule(); // init xbmcvfs modules
+  InitVFSTypes();
 
   CStdString addonVer = ADDON::GetXbmcApiVersionDependency(addon);
   bool bwcompatMode = (addon.get() == NULL || (ADDON::AddonVersion(addonVer) <= ADDON::AddonVersion("1.0")));
@@ -438,7 +524,7 @@ void XBPython::Initialize()
       // Info about interesting python envvars available
       // at http://docs.python.org/using/cmdline.html#environment-variables
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(TARGET_ANDROID)
       /* PYTHONOPTIMIZE is set off intentionally when using external Python.
          Reason for this is because we cannot be sure what version of Python
          was used to compile the various Python object files (i.e. .pyo,
@@ -469,6 +555,13 @@ void XBPython::Initialize()
       buf = "OS=win32";
       pgwin32_putenv(buf.c_str());
 
+#elif defined(TARGET_ANDROID)
+      CStdString apkPath = getenv("XBMC_ANDROID_APK");
+      apkPath += "/assets/python2.6";
+      setenv("PYTHONHOME",apkPath.c_str(), 1);
+      setenv("PYTHONPATH", "", 1);
+      setenv("PYTHONOPTIMIZE","",1);
+      setenv("PYTHONNOUSERSITE","1",1);
 #endif
 
       if (PyEval_ThreadsInitialized())
@@ -490,6 +583,7 @@ void XBPython::Initialize()
       InitGUITypes();
       InitPluginTypes();
       InitAddonTypes();
+      InitVFSTypes();
 
       if (!(m_mainThreadState = PyThreadState_Get()))
         CLog::Log(LOGERROR, "Python threadstate is NULL.");
@@ -524,12 +618,12 @@ void XBPython::Finalize()
     Py_Finalize();
     PyEval_ReleaseLock();
 
-#if !(defined(__APPLE__) || defined(_WIN32))
+#if !(defined(TARGET_DARWIN) || defined(_WIN32))
     UnloadExtensionLibs();
 #endif
 
     // first free all dlls loaded by python, after that python24.dll (this is done by UnloadPythonDlls
-#if !(defined(__APPLE__) || defined(_WIN32))
+#if !(defined(TARGET_DARWIN) || defined(_WIN32))
     DllLoaderContainer::UnloadPythonDlls();
 #endif
 #if defined(_LINUX) && !defined(__APPLE__) && !defined(__FreeBSD__)
@@ -538,7 +632,6 @@ void XBPython::Finalize()
     // The implementation for osx can never unload the python dylib.
     DllLoaderContainer::ReleaseModule(m_pDll);
 #endif
-    m_hModule         = NULL;
     m_mainThreadState = NULL;
     m_bInitialized    = false;
   }

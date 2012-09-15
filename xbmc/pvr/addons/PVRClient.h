@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -23,6 +23,8 @@
 #include "addons/Addon.h"
 #include "addons/AddonDll.h"
 #include "addons/DllPVRClient.h"
+#include "pvr/channels/PVRChannel.h"
+#include "pvr/recordings/PVRRecordings.h"
 
 namespace EPG
 {
@@ -37,10 +39,13 @@ namespace PVR
   class CPVRTimers;
   class CPVRTimerInfoTag;
   class CPVRRecordings;
-  class CPVRRecording;
   class CPVREpgContainer;
+  class CPVRClient;
 
   typedef std::vector<PVR_MENUHOOK> PVR_MENUHOOKS;
+  typedef boost::shared_ptr<CPVRClient> PVR_CLIENT;
+  #define PVR_INVALID_CLIENT_ID (-2)
+  #define PVR_VIRTUAL_CLIENT_ID (-1)
 
   /*!
    * Interface from XBMC to a PVR add-on.
@@ -64,6 +69,11 @@ namespace PVR
     bool Create(int iClientId);
 
     /*!
+     * @return True when the dll for this add-on was loaded, false otherwise (e.g. unresolved symbols)
+     */
+    bool DllLoaded(void) const;
+
+    /*!
      * @brief Destroy the instance of this add-on.
      */
     void Destroy(void);
@@ -82,14 +92,6 @@ namespace PVR
      * @return The ID of this instance.
      */
     int GetID(void) const;
-
-    /*!
-     * @brief Change a setting in the add-on.
-     * @param settingName The name of the setting.
-     * @param settingValue The new value.
-     * @return The status reported by the add-on.
-     */
-    virtual ADDON_STATUS SetSetting(const char *settingName, const void *settingValue);
 
     //@}
     /** @name PVR server methods */
@@ -111,22 +113,22 @@ namespace PVR
     /*!
      * @return The name reported by the backend.
      */
-    CStdString GetBackendName(void);
+    CStdString GetBackendName(void) const;
 
     /*!
      * @return The version string reported by the backend.
      */
-    CStdString GetBackendVersion(void);
+    CStdString GetBackendVersion(void) const;
 
     /*!
      * @return The connection string reported by the backend.
      */
-    CStdString GetConnectionString(void);
+    CStdString GetConnectionString(void) const;
 
     /*!
      * @return A friendly name for this add-on that can be used in log messages.
      */
-    CStdString GetFriendlyName(void);
+    CStdString GetFriendlyName(void) const;
 
     /*!
      * @brief Get the disk space reported by the server.
@@ -136,24 +138,11 @@ namespace PVR
      */
     PVR_ERROR GetDriveSpace(long long *iTotal, long long *iUsed);
 
-  //  /*!
-  //   * @brief Get the time reported by the backend.
-  //   * @param localTime The local time.
-  //   * @param iGmtOffset The GMT offset used.
-  //   * @return PVR_ERROR_NO_ERROR if the time has been fetched successfully.
-  //   */
-  //  PVR_ERROR GetBackendTime(time_t *localTime, int *iGmtOffset);
-
     /*!
      * @brief Start a channel scan on the server.
      * @return PVR_ERROR_NO_ERROR if the channel scan has been started successfully.
      */
     PVR_ERROR StartChannelScan(void);
-
-    /*!
-     * @return The ID of the client.
-     */
-    int GetClientID(void) const;
 
     /*!
      * @return True if this add-on has menu hooks, false otherwise.
@@ -256,6 +245,29 @@ namespace PVR
      */
     PVR_ERROR RenameRecording(const CPVRRecording &recording);
 
+    /*!
+     * @brief Set the play count of a recording on the backend.
+     * @param recording The recording to set the play count.
+     * @param count Play count.
+     * @return PVR_ERROR_NO_ERROR if the recording's play count has been set successfully.
+     */
+    PVR_ERROR SetRecordingPlayCount(const CPVRRecording &recording, int count);
+
+    /*!
+    * @brief Set the last watched position of a recording on the backend.
+    * @param recording The recording.
+    * @param position The last watched position in seconds
+    * @return PVR_ERROR_NO_ERROR if the position has been stored successfully.
+    */
+    PVR_ERROR SetRecordingLastPlayedPosition(const CPVRRecording &recording, int lastplayedposition);
+
+    /*!
+    * @brief Retrieve the last watched position of a recording on the backend.
+    * @param recording The recording.
+    * @return The last watched position in seconds or -1 on error
+    */
+    int GetRecordingLastPlayedPosition(const CPVRRecording &recording);
+
     //@}
     /** @name PVR timer methods */
     //@{
@@ -309,14 +321,15 @@ namespace PVR
     /*!
      * @brief Open a live stream on the server.
      * @param channel The channel to stream.
+     * @param bIsSwitchingChannel True when switching channels, false otherwise.
      * @return True if the stream opened successfully, false otherwise.
      */
-    bool OpenLiveStream(const CPVRChannel &channel);
+    bool OpenStream(const CPVRChannel &channel, bool bIsSwitchingChannel);
 
     /*!
      * @brief Close an open live stream.
      */
-    void CloseLiveStream(void);
+    void CloseStream(void);
 
     /*!
      * @brief Read from an open live stream.
@@ -324,7 +337,7 @@ namespace PVR
      * @param uiBufSize The amount of bytes to read.
      * @return The amount of bytes that were actually read from the stream.
      */
-    int ReadLiveStream(void* lpBuf, int64_t uiBufSize);
+    int ReadStream(void* lpBuf, int64_t uiBufSize);
 
     /*!
      * @brief Seek in a live stream on a backend that supports timeshifting.
@@ -332,17 +345,17 @@ namespace PVR
      * @param iWhence ?
      * @return The new position.
      */
-    int64_t SeekLiveStream(int64_t iFilePosition, int iWhence = SEEK_SET);
+    int64_t SeekStream(int64_t iFilePosition, int iWhence = SEEK_SET);
 
     /*!
      * @return The position in the stream that's currently being read.
      */
-    int64_t PositionLiveStream(void);
+    int64_t GetStreamPosition(void);
 
     /*!
      * @return The total length of the stream that's currently being read.
      */
-    int64_t LengthLiveStream(void);
+    int64_t GetStreamLength(void);
 
     /*!
      * @return The channel number on the server of the live stream that's currently being read.
@@ -379,38 +392,7 @@ namespace PVR
      * @param recording The recording to open.
      * @return True if the stream has been opened succesfully, false otherwise.
      */
-    bool OpenRecordedStream(const CPVRRecording &recording);
-
-    /*!
-     * @brief Close an open stream from a recording.
-     */
-    void CloseRecordedStream(void);
-
-    /*!
-     * @brief Read from a recording.
-     * @param lpBuf The buffer to store the data in.
-     * @param uiBufSize The amount of bytes to read.
-     * @return The amount of bytes that were actually read from the stream.
-     */
-    int ReadRecordedStream(void* lpBuf, int64_t uiBufSize);
-
-    /*!
-     * @brief Seek in a recorded stream.
-     * @param iFilePosition The position to seek to.
-     * @param iWhence ?
-     * @return The new position.
-     */
-    int64_t SeekRecordedStream(int64_t iFilePosition, int iWhence = SEEK_SET);
-
-    /*!
-     * @return The position in the stream that's currently being read.
-     */
-    int64_t PositionRecordedStream(void);
-
-    /*!
-     * @return The total length of the stream that's currently being read.
-     */
-    int64_t LengthRecordedStream(void);
+    bool OpenStream(const CPVRRecording &recording);
 
     //@}
     /** @name PVR demultiplexer methods */
@@ -439,10 +421,119 @@ namespace PVR
 
     //@}
 
-  protected:
+    bool SupportsChannelGroups(void) const;
+    bool SupportsChannelScan(void) const;
+    bool SupportsEPG(void) const;
+    bool SupportsLastPlayedPosition(void) const;
+    bool SupportsRadio(void) const;
+    bool SupportsRecordings(void) const;
+    bool SupportsRecordingFolders(void) const;
+    bool SupportsRecordingPlayCount(void) const;
+    bool SupportsTimers(void) const;
+    bool SupportsTV(void) const;
+    bool HandlesDemuxing(void) const;
+    bool HandlesInputStream(void) const;
+
+    bool IsPlayingLiveStream(void) const;
+    bool IsPlayingLiveTV(void) const;
+    bool IsPlayingLiveRadio(void) const;
+    bool IsPlayingEncryptedChannel(void) const;
+    bool IsPlayingRecording(void) const;
+    bool IsPlaying(void) const;
+    bool GetPlayingChannel(CPVRChannelPtr &channel) const;
+    bool GetPlayingRecording(CPVRRecording &recording) const;
+
+    /*! @name Signal status methods */
+    //@{
+
+    /*!
+     * @brief Get the quality data for the live stream that is currently playing.
+     * @param status A copy of the quality data.
+     */
+    void GetQualityData(PVR_SIGNAL_STATUS *status) const;
+
+    /*!
+     * @return The current signal quality level.
+     */
+    int GetSignalLevel(void) const;
+
+    /*!
+     * @return The current signal/noise ratio.
+     */
+    int GetSNR(void) const;
+
+    /*!
+     * @brief Update the signal status for the tv stream that's currently being read.
+     */
+    void UpdateCharInfoSignalStatus(void);
+
+    //@}
+
+    static const char *ToString(const PVR_ERROR error);
+
+  private:
+    /*!
+     * @brief Checks whether the provided API version is compatible with XBMC
+     * @param minVersion The add-on's XBMC_PVR_MIN_API_VERSION version
+     * @param version The add-on's XBMC_PVR_API_VERSION version
+     * @return True when compatible, false otherwise
+     */
+    static bool IsCompatibleAPIVersion(const ADDON::AddonVersion &minVersion, const ADDON::AddonVersion &version);
+
+    /*!
+     * @brief Reset the signal quality data to the initial values.
+     */
+    void ResetQualityData(PVR_SIGNAL_STATUS &qualityInfo);
+
+    /*!
+     * @brief Resets all class members to their defaults. Called by the constructors.
+     */
+    void ResetProperties(int iClientId = PVR_INVALID_CLIENT_ID);
+
+    bool GetAddonProperties(void);
+
+    /*!
+     * @brief Copy over group info from xbmcGroup to addonGroup.
+     * @param xbmcGroup The group on XBMC's side.
+     * @param addonGroup The group on the addon's side.
+     */
+    static void WriteClientGroupInfo(const CPVRChannelGroup &xbmcGroup, PVR_CHANNEL_GROUP &addonGroup);
+
+    /*!
+     * @brief Copy over recording info from xbmcRecording to addonRecording.
+     * @param xbmcRecording The recording on XBMC's side.
+     * @param addonRecording The recording on the addon's side.
+     */
+    static void WriteClientRecordingInfo(const CPVRRecording &xbmcRecording, PVR_RECORDING &addonRecording);
+
+    /*!
+     * @brief Copy over timer info from xbmcTimer to addonTimer.
+     * @param xbmcTimer The timer on XBMC's side.
+     * @param addonTimer The timer on the addon's side.
+     */
+    static void WriteClientTimerInfo(const CPVRTimerInfoTag &xbmcTimer, PVR_TIMER &addonTimer);
+
+    /*!
+     * @brief Copy over channel info from xbmcChannel to addonClient.
+     * @param xbmcChannel The channel on XBMC's side.
+     * @param addonChannel The channel on the addon's side.
+     */
+    static void WriteClientChannelInfo(const CPVRChannel &xbmcChannel, PVR_CHANNEL &addonChannel);
+
+    /*!
+     * @brief Whether a channel can be played by this add-on
+     * @param channel The channel to check.
+     * @return True when it can be played, false otherwise.
+     */
+    bool CanPlayChannel(const CPVRChannel &channel) const;
+
+    bool LogError(const PVR_ERROR error, const char *strMethod) const;
+    void LogException(const std::exception &e, const char *strFunctionName) const;
+
     bool                   m_bReadyToUse;          /*!< true if this add-on is connected to the backend, false otherwise */
     CStdString             m_strHostName;          /*!< the host name */
     PVR_MENUHOOKS          m_menuhooks;            /*!< the menu hooks for this add-on */
+    int                    m_iClientId;            /*!< database ID of the client */
 
     /* cached data */
     CStdString             m_strBackendName;       /*!< the cached backend version */
@@ -455,45 +546,18 @@ namespace PVR
     bool                   m_bGotFriendlyName;     /*!< true if the friendly name has already been fetched */
     PVR_ADDON_CAPABILITIES m_addonCapabilities;     /*!< the cached add-on capabilities */
     bool                   m_bGotAddonCapabilities; /*!< true if the add-on capabilities have already been fetched */
+    PVR_SIGNAL_STATUS      m_qualityInfo;           /*!< stream quality information */
 
-  private:
-    /*!
-     * @brief Get the backend name from the server and store it locally.
-     */
-    void SetBackendName(void);
+    /* stored strings to make sure const char* members in PVR_PROPERTIES stay valid */
+    std::string m_strUserPath;    /*!< @brief translated path to the user profile */
+    std::string m_strClientPath;  /*!< @brief translated path to this add-on */
 
-    /*!
-     * @brief Get the backend version from the server and store it locally.
-     */
-    void SetBackendVersion(void);
+    CCriticalSection m_critSection;
 
-    /*!
-     * @brief Get the connection string from the server and store it locally.
-     */
-    void SetConnectionString(void);
-
-    /*!
-     * @brief Get the friendly from the server and store it locally.
-     */
-    void SetFriendlyName(void);
-
-    /*!
-     * @brief Get the backend properties from the server and store it locally.
-     */
-    PVR_ERROR SetAddonCapabilities(void);
-
-    /*!
-     * @brief Resets all class members to their defaults. Called by the constructors.
-     */
-    void ResetProperties(void);
-
-    /*!
-     * @brief Reset all add-on capabilities to false.
-     */
-    void ResetAddonCapabilities(void);
-
-  private:
-    const char *ToString(const PVR_ERROR error) const;
-    bool LogError(const PVR_ERROR error, const char *strMethod);
+    bool           m_bIsPlayingTV;
+    CPVRChannelPtr m_playingChannel;
+    bool           m_bIsPlayingRecording;
+    CPVRRecording  m_playingRecording;
+    ADDON::AddonVersion m_apiVersion;
   };
 }

@@ -30,7 +30,7 @@
 #include "utils/LabelFormatter.h"
 #include "music/tags/MusicInfoTag.h"
 #include "guilib/GUIWindowManager.h"
-#include "dialogs/GUIDialogKeyboard.h"
+#include "guilib/GUIKeyboardFactory.h"
 #include "GUIUserMessages.h"
 #include "Favourites.h"
 #include "settings/Settings.h"
@@ -282,7 +282,7 @@ bool CGUIWindowMusicPlayList::MoveCurrentPlayListItem(int iItem, int iAction, bo
 void CGUIWindowMusicPlayList::SavePlayList()
 {
   CStdString strNewFileName;
-  if (CGUIDialogKeyboard::ShowAndGetInput(strNewFileName, g_localizeStrings.Get(16012), false))
+  if (CGUIKeyboardFactory::ShowAndGetInput(strNewFileName, g_localizeStrings.Get(16012), false))
   {
     // need 2 rename it
     CStdString strFolder, strPath;
@@ -478,14 +478,6 @@ void CGUIWindowMusicPlayList::OnItemLoaded(CFileItem* pItem)
       str.Format("%02.2i. %s ", pItem->m_iprogramCount, str);
       pItem->SetLabel(str);
     }
-  }
-
-  //  MusicDb items already have thumbs
-  if (!pItem->IsMusicDb())
-  {
-    // Reset thumbs and default icons
-    pItem->SetMusicThumb();
-    pItem->FillInDefaultIcon();
   }
 }
 

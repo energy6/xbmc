@@ -22,7 +22,6 @@
  */
 
 #include "windows/GUIMediaWindow.h"
-#include "ProgramDatabase.h"
 #include "dialogs/GUIDialogProgress.h"
 #include "ThumbLoader.h"
 
@@ -33,6 +32,7 @@ public:
   CGUIWindowPrograms(void);
   virtual ~CGUIWindowPrograms(void);
   virtual bool OnMessage(CGUIMessage& message);
+  virtual void OnInfo(int iItem);
 protected:
   virtual void OnItemLoaded(CFileItem* pItem) {};
   virtual bool Update(const CStdString& strDirectory);
@@ -42,13 +42,7 @@ protected:
   virtual bool OnContextButton(int itemNumber, CONTEXT_BUTTON button);
   virtual CStdString GetStartFolder(const CStdString &dir);
 
-  int GetRegion(int iItem, bool bReload=false);
-
   CGUIDialogProgress* m_dlgProgress;
-
-  CProgramDatabase m_database;
-
-  int m_iRegionSet; // for cd stuff
 
   CProgramThumbLoader m_thumbLoader;
 };

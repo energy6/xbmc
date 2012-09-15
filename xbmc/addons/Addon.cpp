@@ -26,7 +26,7 @@
 #include "filesystem/Directory.h"
 #include "filesystem/File.h"
 #include "interfaces/python/XBPython.h"
-#ifdef __APPLE__
+#if defined(TARGET_DARWIN)
 #include "../osx/OSXGNUReplacements.h"
 #endif
 #ifdef __FreeBSD__
@@ -34,6 +34,7 @@
 #endif
 #include "utils/log.h"
 #include "utils/URIUtils.h"
+#include "URL.h"
 #include <vector>
 #include <string.h>
 #include <ostream>

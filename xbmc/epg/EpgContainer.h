@@ -1,7 +1,7 @@
 #pragma once
 
 /*
- *      Copyright (C) 2005-2010 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -32,7 +32,7 @@
 #include <map>
 
 class CFileItemList;
-class CGUIDialogExtendedProgressBar;
+class CGUIDialogProgressBarHandle;
 
 namespace EPG
 {
@@ -45,6 +45,11 @@ namespace EPG
     friend class CEpgDatabase;
 
   public:
+    /*!
+     * @brief Create a new EPG table container.
+     */
+    CEpgContainer(void);
+
     /*!
      * @brief Destroy this instance.
      */
@@ -101,15 +106,9 @@ namespace EPG
      * @param obs The observable that sent the update.
      * @param msg The update message.
      */
-    virtual void Notify(const Observable &obs, const CStdString& msg);
+    virtual void Notify(const Observable &obs, const ObservableMessage msg);
 
-    /*!
-     * @brief Update an entry in this container.
-     * @param tag The table to update.
-     * @param bUpdateDatabase If set to true, this table will be persisted in the database.
-     * @return The updated epg table or NULL if it couldn't be found.
-     */
-    virtual bool UpdateEntry(const CEpg &entry, bool bUpdateDatabase = false);
+    CEpg *CreateChannelEpg(PVR::CPVRChannelPtr channel);
 
     /*!
      * @brief Get all EPG tables and apply a filter.
@@ -257,14 +256,11 @@ namespace EPG
     virtual void Process(void);
 
     /*!
-     * @brief Create a new EPG table container.
-     */
-    CEpgContainer(void);
-
-    /*!
      * @brief Load all tables from the database
      */
     void LoadFromDB(void);
+
+    void InsertFromDatabase(int iEpgID, const CStdString &strName, const CStdString &strScraperName);
 
     CEpgDatabase m_database;           /*!< the EPG database */
 
@@ -289,7 +285,7 @@ namespace EPG
     std::map<unsigned int, CEpg*> m_epgs;  /*!< the EPGs in this container */
     //@}
 
-    CGUIDialogExtendedProgressBar *m_progressDialog; /*!< the progress dialog that is visible when updating the first time */
+    CGUIDialogProgressBarHandle *  m_progressHandle; /*!< the progress dialog that is visible when updating the first time */
     CCriticalSection               m_critSection;    /*!< a critical section for changes to this container */
     CEvent                         m_updateEvent;    /*!< trigger when an update finishes */
   };

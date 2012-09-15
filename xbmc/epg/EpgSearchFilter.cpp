@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -154,7 +154,7 @@ bool EpgSearchFilter::MatchChannelNumber(const CEpgInfoTag &tag) const
 
   if (m_iChannelNumber != EPG_SEARCH_UNSET && g_PVRManager.IsStarted())
   {
-    const CPVRChannelGroup *group = (m_iChannelGroup != EPG_SEARCH_UNSET) ? g_PVRChannelGroups->GetByIdFromAll(m_iChannelGroup) : g_PVRChannelGroups->GetGroupAllTV();
+    CPVRChannelGroupPtr group = (m_iChannelGroup != EPG_SEARCH_UNSET) ? g_PVRChannelGroups->GetByIdFromAll(m_iChannelGroup) : g_PVRChannelGroups->GetGroupAllTV();
     if (!group)
       group = CPVRManager::Get().ChannelGroups()->GetGroupAllTV();
 
@@ -170,7 +170,7 @@ bool EpgSearchFilter::MatchChannelGroup(const CEpgInfoTag &tag) const
 
   if (m_iChannelGroup != EPG_SEARCH_UNSET && g_PVRManager.IsStarted())
   {
-    const CPVRChannelGroup *group = g_PVRChannelGroups->GetByIdFromAll(m_iChannelGroup);
+    CPVRChannelGroupPtr group = g_PVRChannelGroups->GetByIdFromAll(m_iChannelGroup);
     bReturn = (group && group->IsGroupMember(*tag.ChannelTag()));
   }
 
@@ -183,12 +183,13 @@ int EpgSearchFilter::FilterRecordings(CFileItemList &results)
   if (!g_PVRManager.IsStarted())
     return iRemoved;
 
-  CPVRRecordings *recordings = CPVRManager::Get().Recordings();
+  CFileItemList recordings;
+  g_PVRRecordings->GetAll(recordings);
 
-  // TODO not thread safe and inefficient!
-  for (unsigned int iRecordingPtr = 0; iRecordingPtr < recordings->size(); iRecordingPtr++)
+  // TODO inefficient!
+  for (int iRecordingPtr = 0; iRecordingPtr < recordings.Size(); iRecordingPtr++)
   {
-    CPVRRecording *recording = recordings->at(iRecordingPtr);
+    CPVRRecording *recording = recordings.Get(iRecordingPtr)->GetPVRRecordingInfoTag();
     if (!recording)
       continue;
 
@@ -198,8 +199,8 @@ int EpgSearchFilter::FilterRecordings(CFileItemList &results)
 
       /* no match */
       if (!epgentry ||
-          epgentry->Title()       != recording->m_strTitle ||
-          epgentry->Plot()        != recording->m_strPlot)
+          epgentry->Title() != recording->m_strTitle ||
+          epgentry->Plot()  != recording->m_strPlot)
         continue;
 
       results.Remove(iResultPtr);
@@ -217,13 +218,15 @@ int EpgSearchFilter::FilterTimers(CFileItemList &results)
   if (!g_PVRManager.IsStarted())
     return iRemoved;
 
-  vector<CPVRTimerInfoTag *> timers;
-  g_PVRTimers->GetActiveTimers(&timers);
-
-  // TODO not thread safe and inefficient!
+  vector<CFileItemPtr> timers = g_PVRTimers->GetActiveTimers();
+  // TODO inefficient!
   for (unsigned int iTimerPtr = 0; iTimerPtr < timers.size(); iTimerPtr++)
   {
-    CPVRTimerInfoTag *timer = timers.at(iTimerPtr);
+    CFileItemPtr fileItem = timers.at(iTimerPtr);
+    if (!fileItem || !fileItem->HasPVRTimerInfoTag())
+      continue;
+
+    CPVRTimerInfoTag *timer = fileItem->GetPVRTimerInfoTag();
     if (!timer)
       continue;
 
@@ -231,7 +234,7 @@ int EpgSearchFilter::FilterTimers(CFileItemList &results)
     {
       const CEpgInfoTag *epgentry = results.Get(iResultPtr)->GetEPGInfoTag();
       if (!epgentry ||
-          *epgentry->ChannelTag() != *timer->m_channel ||
+          *epgentry->ChannelTag() != *timer->ChannelTag() ||
           epgentry->StartAsUTC()   <  timer->StartAsUTC() ||
           epgentry->EndAsUTC()     >  timer->EndAsUTC())
         continue;

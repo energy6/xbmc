@@ -28,6 +28,7 @@
 #include "guilib/GUIListItem.h"
 #include "utils/Archive.h"
 #include "utils/ISerializable.h"
+#include "utils/ISortable.h"
 #include "XBDateTime.h"
 #include "SortFileItem.h"
 #include "utils/LabelFormatter.h"
@@ -71,7 +72,7 @@ class CMediaSource;
   \sa CFileItemList
   */
 class CFileItem :
-  public CGUIListItem, public IArchivable, public ISerializable
+  public CGUIListItem, public IArchivable, public ISerializable, public ISortable
 {
 public:
   CFileItem(void);
@@ -100,6 +101,7 @@ public:
   const CFileItem& operator=(const CFileItem& item);
   virtual void Archive(CArchive& ar);
   virtual void Serialize(CVariant& value);
+  virtual void ToSortable(SortItem &sortable);
   virtual bool IsFileItem() const { return true; };
 
   bool Exists(bool bUseCache = true) const;
@@ -115,18 +117,17 @@ public:
   bool IsPlayList() const;
   bool IsSmartPlayList() const;
   bool IsPythonScript() const;
-  bool IsXBE() const;
   bool IsPlugin() const;
   bool IsScript() const;
   bool IsAddonsPath() const;
   bool IsSourcesPath() const;
-  bool IsShortCut() const;
   bool IsNFO() const;
   bool IsDVDImage() const;
   bool IsOpticalMediaFile() const;
   bool IsDVDFile(bool bVobs = true, bool bIfos = true) const;
   bool IsBDFile() const;
   bool IsRAR() const;
+  bool IsAPK() const;
   bool IsZIP() const;
   bool IsCBZ() const;
   bool IsCBR() const;
@@ -166,11 +167,11 @@ public:
   bool IsPVR() const;
   bool IsLiveTV() const;
   bool IsRSS() const;
+  bool IsAndroidApp() const;
 
   void RemoveExtension();
   void CleanString();
   void FillInDefaultIcon();
-  void SetMusicThumb(bool alwaysCheckRemote = false);
   void SetFileSizeLabel();
   virtual void SetLabel(const CStdString &strLabel);
   virtual void SetLabel2(const CStdString &strLabel);
@@ -178,9 +179,9 @@ public:
   int GetVideoContentType() const; /* return VIDEODB_CONTENT_TYPE, but don't want to include videodb in this header */
   bool IsLabelPreformated() const { return m_bLabelPreformated; }
   void SetLabelPreformated(bool bYesNo) { m_bLabelPreformated=bYesNo; }
-  bool SortsOnTop() const { return m_specialSort == SORT_ON_TOP; }
-  bool SortsOnBottom() const { return m_specialSort == SORT_ON_BOTTOM; }
-  void SetSpecialSort(SPECIAL_SORT sort) { m_specialSort = sort; }
+  bool SortsOnTop() const { return m_specialSort == SortSpecialOnTop; }
+  bool SortsOnBottom() const { return m_specialSort == SortSpecialOnBottom; }
+  void SetSpecialSort(SortSpecial sort) { m_specialSort = sort; }
 
   inline bool HasMusicInfoTag() const
   {
@@ -266,32 +267,12 @@ public:
 
   CPictureInfoTag* GetPictureInfoTag();
 
-  // Gets the cached thumb filename (no existence checks)
-  CStdString GetCachedArtistThumb() const;
-  /*!
-   \brief Get the cached fanart path for this item if it exists
-   \return path to the cached fanart for this item, or empty if none exists
-   \sa CacheLocalFanart, GetLocalFanart
-   */
-  CStdString GetCachedFanart() const;
-  static CStdString GetCachedThumb(const CStdString &path, const CStdString& strPath2, bool split=false);
-
-  /*!
-   \brief Cache a copy of the local fanart for this item if we don't already have an image cached
-   \return true if we already have cached fanart or if the caching was successful, false if no image is cached.
-   \sa GetLocalFanart, GetCachedFanart
-   */
-  bool CacheLocalFanart() const;
   /*!
    \brief Get the local fanart for this item if it exists
    \return path to the local fanart for this item, or empty if none exists
-   \sa CacheLocalFanart, GetCachedFanart
+   \sa GetFolderThumb, GetTBNFile
    */
   CStdString GetLocalFanart() const;
-
-  // Sets the cached thumb for the item if it exists
-  void SetCachedArtistThumb();
-  void SetCachedMusicThumb();
 
   // Gets the .tbn file associated with this item
   CStdString GetTBNFile() const;
@@ -316,9 +297,6 @@ public:
   // Gets the user thumb, if it exists
   CStdString GetUserVideoThumb() const;
   CStdString GetUserMusicThumb(bool alwaysCheckRemote = false) const;
-
-  // Caches the user thumb and assigns it to the item
-  void SetUserMusicThumb(bool alwaysCheckRemote = false);
 
   /*! \brief Get the path where we expect local metadata to reside.
    For a folder, this is just the existing path (eg tvshow folder)
@@ -362,11 +340,7 @@ public:
   bool IsSamePath(const CFileItem *item) const;
 
   bool IsAlbum() const;
-private:
-  // Gets the previously cached thumb file (with existence checks)
-  CStdString GetPreviouslyCachedMusicThumb() const;
 
-public:
   bool m_bIsShareOrDrive;    ///< is this a root share/drive
   int m_iDriveType;     ///< If \e m_bIsShareOrDrive is \e true, use to get the share type. Types see: CMediaSource::m_iDriveType
   CDateTime m_dateTime;             ///< file creation date & time
@@ -376,6 +350,7 @@ public:
   int m_iprogramCount;
   int m_idepth;
   int m_lStartOffset;
+  int m_lStartPartNumber;
   int m_lEndOffset;
   LockType m_iLockMode;
   CStdString m_strLockCode;
@@ -385,7 +360,7 @@ public:
 private:
   CStdString m_strPath;            ///< complete path to item
 
-  SPECIAL_SORT m_specialSort;
+  SortSpecial m_specialSort;
   bool m_bIsParentFolder;
   bool m_bCanQueue;
   bool m_bLabelPreformated;
@@ -473,9 +448,8 @@ public:
   void Assign(const CFileItemList& itemlist, bool append = false);
   bool Copy  (const CFileItemList& item);
   void Reserve(int iCount);
-  void Sort(SORT_METHOD sortMethod, SORT_ORDER sortOrder);
+  void Sort(SORT_METHOD sortMethod, SortOrder sortOrder);
   void Randomize();
-  void SetMusicThumbs();
   void FillInDefaultIcons();
   int GetFolderCount() const;
   int GetFileCount() const;
@@ -494,7 +468,7 @@ public:
    */
   void Stack(bool stackFiles = true);
 
-  SORT_ORDER GetSortOrder() const { return m_sortOrder; }
+  SortOrder GetSortOrder() const { return m_sortOrder; }
   SORT_METHOD GetSortMethod() const { return m_sortMethod; }
   /*! \brief load a CFileItemList out of the cache
 
@@ -533,8 +507,6 @@ public:
    */
   void RemoveDiscCache(int windowID = 0) const;
   bool AlwaysCache() const;
-
-  void SetCachedMusicThumbs();
 
   void Swap(unsigned int item1, unsigned int item2);
 
@@ -582,7 +554,7 @@ private:
   MAPFILEITEMS m_map;
   bool m_fastLookup;
   SORT_METHOD m_sortMethod;
-  SORT_ORDER m_sortOrder;
+  SortOrder m_sortOrder;
   bool m_sortIgnoreFolders;
   CACHE_TYPE m_cacheToDisc;
   bool m_replaceListing;

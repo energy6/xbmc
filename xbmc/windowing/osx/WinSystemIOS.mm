@@ -19,7 +19,7 @@
  *
  */
 
-#if defined(__APPLE__) && defined(__arm__)
+#if defined(TARGET_DARWIN_IOS)
 //hack around problem with xbmc's typedef int BOOL
 // and obj-c's typedef unsigned char BOOL
 #define BOOL XBMC_BOOL 
@@ -30,16 +30,20 @@
 #define BOOL XBMC_BOOL 
 #include "WinSystemIOS.h"
 #include "utils/log.h"
-#include "SpecialProtocol.h"
-#include "Settings.h"
-#include "Texture.h"
+#include "filesystem/SpecialProtocol.h"
+#include "settings/Settings.h"
+#include "guilib/Texture.h"
 #include <vector>
 #undef BOOL
 
 #import <Foundation/Foundation.h>
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
-#import "XBMCController.h"
+#if defined(TARGET_DARWIN_IOS_ATV2)
+#import "atv2/XBMCController.h"
+#else
+#import "ios/XBMCController.h"
+#endif
 #include "osx/DarwinUtils.h"
 #import <dlfcn.h>
 

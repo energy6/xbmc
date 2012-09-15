@@ -21,6 +21,7 @@
 
 #include "ADPCMCodec.h"
 #include "utils/log.h"
+#include "cores/AudioEngine/Utils/AEUtil.h"
 
 ADPCMCodec::ADPCMCodec()
 {
@@ -53,7 +54,6 @@ bool ADPCMCodec::Init(const CStdString &strFile, unsigned int filecache)
   m_BitsPerSample = 16;//m_dll.GetSampleSize(m_adpcm);
   m_DataFormat = AE_FMT_S16NE;
   m_TotalTime = m_dll.GetLength(m_adpcm); // fixme?
-  m_iDataPos = 0;
 
   return true;
 }
@@ -91,3 +91,15 @@ bool ADPCMCodec::CanInit()
   return m_dll.CanLoad();
 }
 
+CAEChannelInfo ADPCMCodec::GetChannelInfo()
+{
+  static enum AEChannel map[2][3] = {
+    {AE_CH_FC, AE_CH_NULL},
+    {AE_CH_FL, AE_CH_FR  , AE_CH_NULL}
+  };
+
+  if (m_Channels > 2)
+    return CAEUtil::GuessChLayout(m_Channels);
+
+  return CAEChannelInfo(map[m_Channels - 1]);
+}

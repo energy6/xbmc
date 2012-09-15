@@ -74,13 +74,11 @@ public:
   const int        player;
   // stuff to handle starting after seek
   double   startpts;
-  CDVDMsg* startsync;
 
   CCurrentStream(StreamType t, int i)
     : type(t)
     , player(i)
   {
-    startsync = NULL;
     Clear();
   }
 
@@ -94,9 +92,6 @@ public:
     stream = NULL;
     inited = false;
     started = false;
-    if(startsync)
-      startsync->Release();
-    startsync = NULL;
     startpts  = DVD_NOPTS_VALUE;
   }
 
@@ -115,7 +110,7 @@ typedef struct
   StreamType   type;
   int          type_index;
   std::string  filename;
-  std::string  filename2;  // for vobsub subtitles, 2 files are necessary (idx/sub) 
+  std::string  filename2;  // for vobsub subtitles, 2 files are necessary (idx/sub)
   std::string  language;
   std::string  name;
   CDemuxStream::EFlags flags;
@@ -187,6 +182,8 @@ public:
   virtual float GetPercentage();
   virtual float GetCachePercentage();
 
+  virtual void RegisterAudioCallback(IAudioCallback* pCallback) { m_dvdPlayerAudio.RegisterAudioCallback(pCallback); }
+  virtual void UnRegisterAudioCallback()                        { m_dvdPlayerAudio.UnRegisterAudioCallback(); }
   virtual void SetVolume(float nVolume)                         { m_dvdPlayerAudio.SetVolume(nVolume); }
   virtual void SetDynamicRangeCompression(long drc)             { m_dvdPlayerAudio.SetDynamicRangeCompression(drc); }
   virtual void GetAudioInfo(CStdString& strAudioInfo);
@@ -229,7 +226,7 @@ public:
 
   virtual void SeekTime(int64_t iTime);
   virtual int64_t GetTime();
-  virtual int GetTotalTime();
+  virtual int64_t GetTotalTime();
   virtual void ToFFRW(int iSpeed);
   virtual bool OnAction(const CAction &action);
   virtual bool HasMenu();
@@ -317,8 +314,8 @@ protected:
   void HandlePlaySpeed();
   bool IsInMenu() const;
 
-  void SynchronizePlayers(DWORD sources);
-  void SynchronizeDemuxer(DWORD timeout);
+  void SynchronizePlayers(unsigned int sources);
+  void SynchronizeDemuxer(unsigned int timeout);
   void CheckAutoSceneSkip();
   void CheckContinuity(CCurrentStream& current, DemuxPacket* pPacket);
   bool CheckSceneSkip(CCurrentStream& current);
@@ -347,7 +344,6 @@ protected:
   std::string  m_mimetype;  // hold a hint to what content file contains (mime type)
   ECacheState  m_caching;
   CFileItem    m_item;
-  unsigned int m_scanStart;
   unsigned int m_iChannelEntryTimeOut;
 
 
@@ -383,7 +379,7 @@ protected:
   CDVDDemux* m_pSubtitleDemuxer;
 
   CStdString m_lastSub;
-  
+
   struct SDVDInfo
   {
     void Clear()
@@ -465,31 +461,13 @@ protected:
       commbreak_start = -1;
       commbreak_end = -1;
       seek_to_start = false;
-      reset = 0;
       mute = false;
-    }
-
-    void ResetCutMarker(double timeout)
-    {
-      if(reset != 0
-      && reset + DVD_MSEC_TO_TIME(timeout) > CDVDClock::GetAbsoluteClock())
-        return;
-
-      /*
-       * Reset the automatic EDL skip marker for a cut so automatic seeking can happen again if,
-       * for example, the initial automatic skip ended up back in the cut due to seeking
-       * inaccuracies.
-       */
-      cut = -1;
-
-      reset = CDVDClock::GetAbsoluteClock();
     }
 
     int cut;              // last automatically skipped EDL cut seek position
     int commbreak_start;  // start time of the last commercial break automatically skipped
     int commbreak_end;    // end time of the last commercial break automatically skipped
     bool seek_to_start;   // whether seeking can go back to the start of a previously skipped break
-    double reset;         // last actual reset time
     bool mute;            // whether EDL mute is on
 
   } m_EdlAutoSkipMarkers;

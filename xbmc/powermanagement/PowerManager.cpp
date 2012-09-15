@@ -37,8 +37,10 @@
 #include "utils/LCDFactory.h"
 #endif
 
-#ifdef __APPLE__
+#if defined(TARGET_DARWIN)
 #include "osx/CocoaPowerSyscall.h"
+#elif defined(TARGET_ANDROID)
+#include "android/AndroidPowerSyscall.h"
 #elif defined(_LINUX) && defined(HAS_DBUS)
 #include "linux/ConsoleUPowerSyscall.h"
 #include "linux/ConsoleDeviceKitPowerSyscall.h"
@@ -66,8 +68,10 @@ CPowerManager::~CPowerManager()
 
 void CPowerManager::Initialize()
 {
-#if defined(__APPLE__)
+#if defined(TARGET_DARWIN)
   m_instance = new CCocoaPowerSyscall();
+#elif defined(TARGET_ANDROID)
+  m_instance = new CAndroidPowerSyscall();
 #elif defined(_LINUX) && defined(HAS_DBUS)
   if (CConsoleUPowerSyscall::HasDeviceConsoleKit())
     m_instance = new CConsoleUPowerSyscall();
@@ -206,7 +210,7 @@ void CPowerManager::OnWake()
   // reset out timers
   g_application.ResetShutdownTimers();
 
-#ifdef HAS_SDL
+#if defined(HAS_SDL) || defined(TARGET_WINDOWS)
   if (g_Windowing.IsFullScreen())
   {
 #ifdef _WIN32

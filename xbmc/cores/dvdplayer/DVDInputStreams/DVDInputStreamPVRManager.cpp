@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2005-2009 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -28,6 +28,8 @@
 #include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "pvr/addons/PVRClients.h"
+#include "pvr/channels/PVRChannelGroupsContainer.h"
+#include "settings/GUISettings.h"
 
 using namespace XFILE;
 using namespace PVR;
@@ -44,6 +46,8 @@ CDVDInputStreamPVRManager::CDVDInputStreamPVRManager(IDVDPlayer* pPlayer) : CDVD
   m_pLiveTV         = NULL;
   m_pOtherStream    = NULL;
   m_eof             = true;
+  m_bReopened       = false;
+  m_iScanTimeout    = 0;
 }
 
 /************************************************************************
@@ -54,8 +58,19 @@ CDVDInputStreamPVRManager::~CDVDInputStreamPVRManager()
   Close();
 }
 
+void CDVDInputStreamPVRManager::ResetScanTimeout(unsigned int iTimeoutMs)
+{
+  m_iScanTimeout = iTimeoutMs > 0 ?
+      XbmcThreads::SystemClockMillis() + iTimeoutMs :
+      0;
+}
+
 bool CDVDInputStreamPVRManager::IsEOF()
 {
+  // don't mark as eof while within the scan timeout
+  if (m_iScanTimeout && XbmcThreads::SystemClockMillis() < m_iScanTimeout)
+    return false;
+
   if (m_pOtherStream)
     return m_pOtherStream->IsEOF();
   else
@@ -67,7 +82,7 @@ bool CDVDInputStreamPVRManager::Open(const char* strFile, const std::string& con
   /* Open PVR File for both cases, to have access to ILiveTVInterface and
    * IRecordable
    */
-  m_pFile       = new CPVRFile();
+  m_pFile       = new CPVRFile;
   m_pLiveTV     = ((CPVRFile*)m_pFile)->GetLiveTV();
   m_pRecordable = ((CPVRFile*)m_pFile)->GetRecordable();
 
@@ -77,6 +92,8 @@ bool CDVDInputStreamPVRManager::Open(const char* strFile, const std::string& con
   {
     delete m_pFile;
     m_pFile = NULL;
+    m_pLiveTV = NULL;
+    m_pRecordable = NULL;
     return false;
   }
   m_eof = false;
@@ -108,11 +125,17 @@ bool CDVDInputStreamPVRManager::Open(const char* strFile, const std::string& con
       CLog::Log(LOGERROR, "CDVDInputStreamPVRManager::Open - error opening [%s]", transFile.c_str());
       delete m_pFile;
       m_pFile = NULL;
+      m_pLiveTV = NULL;
+      m_pRecordable = NULL;
       delete m_pOtherStream;
       m_pOtherStream = NULL;
       return false;
     }
   }
+
+  ResetScanTimeout((unsigned int) g_guiSettings.GetInt("pvrplayback.scantime") * 1000);
+  m_content = content;
+  CLog::Log(LOGDEBUG, "CDVDInputStreamPVRManager::Open - stream opened: %s", transFile.c_str());
 
   return true;
 }
@@ -140,6 +163,8 @@ void CDVDInputStreamPVRManager::Close()
   m_pRecordable     = NULL;
   m_pOtherStream    = NULL;
   m_eof             = true;
+
+  CLog::Log(LOGDEBUG, "CDVDInputStreamPVRManager::Close - stream closed");
 }
 
 int CDVDInputStreamPVRManager::Read(BYTE* buf, int buf_size)
@@ -201,7 +226,7 @@ int CDVDInputStreamPVRManager::GetTotalTime()
   return 0;
 }
 
-int CDVDInputStreamPVRManager::GetStartTime()
+int CDVDInputStreamPVRManager::GetTime()
 {
   if (m_pLiveTV)
     return m_pLiveTV->GetStartTime();
@@ -210,33 +235,70 @@ int CDVDInputStreamPVRManager::GetStartTime()
 
 bool CDVDInputStreamPVRManager::NextChannel(bool preview/* = false*/)
 {
-  if (m_pLiveTV)
+  PVR_CLIENT client;
+  if (!preview && !SupportsChannelSwitch())
+  {
+    CPVRChannelPtr channel;
+    g_PVRManager.GetCurrentChannel(channel);
+    CFileItemPtr item = g_PVRChannelGroups->Get(channel->IsRadio())->GetSelectedGroup()->GetByChannelUp(*channel);
+    if (item.get())
+      return CloseAndOpen(item->GetPath().c_str());
+  }
+  else if (m_pLiveTV)
     return m_pLiveTV->NextChannel(preview);
   return false;
 }
 
 bool CDVDInputStreamPVRManager::PrevChannel(bool preview/* = false*/)
 {
-  if (m_pLiveTV)
+  PVR_CLIENT client;
+  if (!preview && !SupportsChannelSwitch())
+  {
+    CPVRChannelPtr channel;
+    g_PVRManager.GetCurrentChannel(channel);
+    CFileItemPtr item = g_PVRChannelGroups->Get(channel->IsRadio())->GetSelectedGroup()->GetByChannelDown(*channel);
+    if (item.get())
+      return CloseAndOpen(item->GetPath().c_str());
+  }
+  else if (m_pLiveTV)
     return m_pLiveTV->PrevChannel(preview);
   return false;
 }
 
-bool CDVDInputStreamPVRManager::SelectChannelByNumber(unsigned int channel)
+bool CDVDInputStreamPVRManager::SelectChannelByNumber(unsigned int iChannelNumber)
 {
-  if (m_pLiveTV)
-    return m_pLiveTV->SelectChannel(channel);
+  PVR_CLIENT client;
+  if (!SupportsChannelSwitch())
+  {
+    CPVRChannelPtr channel;
+    g_PVRManager.GetCurrentChannel(channel);
+    CFileItemPtr item = g_PVRChannelGroups->Get(channel->IsRadio())->GetSelectedGroup()->GetByChannelNumber(iChannelNumber);
+    if (item.get())
+      return CloseAndOpen(item->GetPath().c_str());
+  }
+  else if (m_pLiveTV)
+    return m_pLiveTV->SelectChannel(iChannelNumber);
+
   return false;
 }
 
 bool CDVDInputStreamPVRManager::SelectChannel(const CPVRChannel &channel)
 {
-  if (m_pLiveTV)
+  PVR_CLIENT client;
+  if (!SupportsChannelSwitch())
+  {
+    CFileItem item(channel);
+    return CloseAndOpen(item.GetPath().c_str());
+  }
+  else if (m_pLiveTV)
+  {
     return m_pLiveTV->SelectChannel(channel.ChannelNumber());
+  }
+
   return false;
 }
 
-bool CDVDInputStreamPVRManager::GetSelectedChannel(CPVRChannel &channel) const
+bool CDVDInputStreamPVRManager::GetSelectedChannel(CPVRChannelPtr& channel) const
 {
   return g_PVRManager.GetCurrentChannel(channel);
 }
@@ -252,16 +314,21 @@ CDVDInputStream::ENextStream CDVDInputStreamPVRManager::NextStream()
 {
   if(!m_pFile) return NEXTSTREAM_NONE;
 
+  if(m_bReopened)
+  {
+    m_bReopened = false;
+    m_eof       = false;
+    return NEXTSTREAM_RETRY;
+  }
+
   if (m_pOtherStream)
     return m_pOtherStream->NextStream();
-  else
+  else if(m_pFile->SkipNext())
   {
-    if(m_pFile->SkipNext())
-    {
-      m_eof = false;
-      return NEXTSTREAM_OPEN;
-    }
+    m_eof = false;
+    return NEXTSTREAM_OPEN;
   }
+
   return NEXTSTREAM_NONE;
 }
 
@@ -291,4 +358,24 @@ CStdString CDVDInputStreamPVRManager::GetInputFormat()
   if (!m_pOtherStream && g_PVRManager.IsStarted())
     return g_PVRClients->GetCurrentInputFormat();
   return StringUtils::EmptyString;
+}
+
+bool CDVDInputStreamPVRManager::CloseAndOpen(const char* strFile)
+{
+  Close();
+
+  if (Open(strFile, m_content))
+  {
+    m_bReopened = true;
+    return true;
+  }
+
+  return false;
+}
+
+bool CDVDInputStreamPVRManager::SupportsChannelSwitch(void) const
+{
+  PVR_CLIENT client;
+  return g_PVRClients->GetPlayingClient(client) &&
+         client->HandlesInputStream();
 }

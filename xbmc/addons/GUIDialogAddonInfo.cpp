@@ -214,10 +214,8 @@ void CGUIDialogAddonInfo::OnEnable(bool enable)
   CStdString xbmcPath = CSpecialProtocol::TranslatePath("special://xbmc/addons");
   CAddonDatabase database;
   database.Open();
-//  if (m_localAddon->Type() == ADDON_PVRDLL && m_localAddon->Path().Left(xbmcPath.size()).Equals(xbmcPath))
-//    database.EnableSystemPVRAddon(m_localAddon->ID(), enable);
-//  else
-    database.DisableAddon(m_localAddon->ID(), !enable);
+  database.DisableAddon(m_localAddon->ID(), !enable);
+  database.Close();
 
   if (m_localAddon->Type() == ADDON_PVRDLL && enable)
     g_application.StartPVRManager();
@@ -389,7 +387,7 @@ void CGUIDialogAddonInfo::GrabRollbackVersions()
 {
   CFileItemList items;
   XFILE::CDirectory::GetDirectory("special://home/addons/packages/",items,".zip",DIR_FLAG_NO_FILE_DIRS);
-  items.Sort(SORT_METHOD_LABEL,SORT_ORDER_ASC);
+  items.Sort(SORT_METHOD_LABEL, SortOrderAscending);
   for (int i=0;i<items.Size();++i)
   {
     if (items[i]->m_bIsFolder)

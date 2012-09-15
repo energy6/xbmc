@@ -22,7 +22,6 @@
 
 #include "ImusicInfoTagLoader.h"
 #include "DllASAP.h"
-#include "cores/paplayer/ASAPCodec.h"
 
 namespace MUSIC_INFO
 {
@@ -32,7 +31,7 @@ namespace MUSIC_INFO
     CMusicInfoTagLoaderASAP(void);
     virtual ~CMusicInfoTagLoaderASAP();
 
-    virtual bool Load(const CStdString& strFileName, CMusicInfoTag& tag);
+    virtual bool Load(const CStdString& strFileName, CMusicInfoTag& tag, EmbeddedArt *art = NULL);
   private:
     DllASAP m_dll;
   };

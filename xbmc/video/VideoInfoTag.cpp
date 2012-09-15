@@ -51,8 +51,9 @@ void CVideoInfoTag::Reset()
   m_strSortTitle.clear();
   m_strVotes.clear();
   m_cast.clear();
-  m_set.clear();
-  m_setId.clear();
+  m_strSet.clear();
+  m_iSetId = -1;
+  m_tags.clear();
   m_strFile.clear();
   m_strPath.clear();
   m_strIMDBNumber.clear();
@@ -89,6 +90,7 @@ void CVideoInfoTag::Reset()
   m_resumePoint.Reset();
   m_resumePoint.type = CBookmark::RESUME;
   m_iIdShow = -1;
+  m_iIdSeason = -1;
   m_strShowPath.clear();
   m_dateAdded.Reset();
   m_type.clear();
@@ -172,7 +174,8 @@ bool CVideoInfoTag::Save(TiXmlNode *node, const CStdString &tag, bool savePathIn
   XMLUtils::SetString(movie, "id", m_strIMDBNumber);
   XMLUtils::SetStringArray(movie, "genre", m_genre);
   XMLUtils::SetStringArray(movie, "country", m_country);
-  XMLUtils::SetStringArray(movie, "set", m_set);
+  XMLUtils::SetString(movie, "set", m_strSet);
+  XMLUtils::SetStringArray(movie, "tag", m_tags);
   XMLUtils::SetStringArray(movie, "credits", m_writingCredits);
   XMLUtils::SetStringArray(movie, "director", m_director);
   XMLUtils::SetDate(movie, "premiered", m_premiered);
@@ -288,8 +291,9 @@ void CVideoInfoTag::Archive(CArchive& ar)
       ar << m_cast[i].thumbUrl.m_xml;
     }
 
-    ar << m_set;
-    ar << m_setId;
+    ar << m_strSet;
+    ar << m_iSetId;
+    ar << m_tags;
     ar << m_strRuntime;
     ar << m_strFile;
     ar << m_strPath;
@@ -329,6 +333,7 @@ void CVideoInfoTag::Archive(CArchive& ar)
     ar << m_strShowPath;
     ar << m_dateAdded.GetAsDBDateTime();
     ar << m_type;
+    ar << m_iIdSeason;
   }
   else
   {
@@ -363,8 +368,9 @@ void CVideoInfoTag::Archive(CArchive& ar)
       m_cast.push_back(info);
     }
 
-    ar >> m_set;
-    ar >> m_setId;
+    ar >> m_strSet;
+    ar >> m_iSetId;
+    ar >> m_tags;
     ar >> m_strRuntime;
     ar >> m_strFile;
     ar >> m_strPath;
@@ -407,24 +413,22 @@ void CVideoInfoTag::Archive(CArchive& ar)
     ar >> dateAdded;
     m_dateAdded.SetFromDBDateTime(dateAdded);
     ar >> m_type;
+    ar >> m_iIdSeason;
   }
 }
 
 void CVideoInfoTag::Serialize(CVariant& value)
 {
-  /* TODO:
-     All the StringUtils::Join() calls can be removed once backwards-compatibility to
-     JSON-RPC v4 can be broken */
-  value["director"] = StringUtils::Join(m_director, " / ");
-  value["writer"] = StringUtils::Join(m_writingCredits, " / ");
-  value["genre"] = StringUtils::Join(m_genre, " / ");
-  value["country"] = StringUtils::Join(m_country, " / ");
+  value["director"] = m_director;
+  value["writer"] = m_writingCredits;
+  value["genre"] = m_genre;
+  value["country"] = m_country;
   value["tagline"] = m_strTagLine;
   value["plotoutline"] = m_strPlotOutline;
   value["plot"] = m_strPlot;
   value["title"] = m_strTitle;
   value["votes"] = m_strVotes;
-  value["studio"] = StringUtils::Join(m_studio, " / ");
+  value["studio"] = m_studio;
   value["trailer"] = m_strTrailer;
   value["cast"] = CVariant(CVariant::VariantTypeArray);
   for (unsigned int i = 0; i < m_cast.size(); ++i)
@@ -436,10 +440,9 @@ void CVideoInfoTag::Serialize(CVariant& value)
       actor["thumbnail"] = CTextureCache::GetWrappedImageURL(m_cast[i].thumb);
     value["cast"].push_back(actor);
   }
-  value["set"] = m_set;
-  value["setid"] = CVariant(CVariant::VariantTypeArray);
-  for (unsigned int i = 0; i < m_setId.size(); i++)
-    value["setid"].push_back(m_setId[i]);
+  value["set"] = m_strSet;
+  value["setid"] = m_iSetId;
+  value["tag"] = m_tags;
   value["runtime"] = m_strRuntime;
   value["file"] = m_strFile;
   value["path"] = m_strPath;
@@ -455,7 +458,7 @@ void CVideoInfoTag::Serialize(CVariant& value)
   value["firstaired"] = m_firstAired.IsValid() ? m_firstAired.GetAsDBDate() : StringUtils::EmptyString;
   value["showtitle"] = m_strShowTitle;
   value["album"] = m_strAlbum;
-  value["artist"] = StringUtils::Join(m_artist, " / ");
+  value["artist"] = m_artist;
   value["playcount"] = m_playCount;
   value["lastplayed"] = m_lastPlayed.IsValid() ? m_lastPlayed.GetAsDBDateTime() : StringUtils::EmptyString;
   value["top250"] = m_iTop250;
@@ -466,7 +469,7 @@ void CVideoInfoTag::Serialize(CVariant& value)
   value["dbid"] = m_iDbId;
   value["fileid"] = m_iFileId;
   value["track"] = m_iTrack;
-  value["showlink"] = StringUtils::Join(m_showLink, " / ");
+  value["showlink"] = m_showLink;
   m_streamDetails.Serialize(value["streamdetails"]);
   CVariant resume = CVariant(CVariant::VariantTypeObject);
   resume["position"] = (float)m_resumePoint.timeInSeconds;
@@ -476,6 +479,61 @@ void CVideoInfoTag::Serialize(CVariant& value)
   value["tvshowpath"] = m_strShowPath;
   value["dateadded"] = m_dateAdded.IsValid() ? m_dateAdded.GetAsDBDateTime() : StringUtils::EmptyString;
   value["type"] = m_type;
+  value["seasonid"] = m_iIdSeason;
+}
+
+void CVideoInfoTag::ToSortable(SortItem& sortable)
+{
+  sortable[FieldDirector] = m_director;
+  sortable[FieldWriter] = m_writingCredits;
+  sortable[FieldGenre] = m_genre;
+  sortable[FieldCountry] = m_country;
+  sortable[FieldTagline] = m_strTagLine;
+  sortable[FieldPlotOutline] = m_strPlotOutline;
+  sortable[FieldPlot] = m_strPlot;
+  sortable[FieldTitle] = m_strTitle;
+  sortable[FieldVotes] = m_strVotes;
+  sortable[FieldStudio] = m_studio;
+  sortable[FieldTrailer] = m_strTrailer;
+  sortable[FieldSet] = m_strSet;
+  sortable[FieldTime] = m_strRuntime;
+  sortable[FieldFilename] = m_strFile;
+  sortable[FieldMPAA] = m_strMPAARating;
+  sortable[FieldPath] = m_strFileNameAndPath;
+  sortable[FieldSortTitle] = m_strSortTitle;
+  sortable[FieldTvShowStatus] = m_strStatus;
+  sortable[FieldProductionCode] = m_strProductionCode;
+  sortable[FieldAirDate] = m_firstAired.IsValid() ? m_firstAired.GetAsDBDate() : (m_premiered.IsValid() ? m_premiered.GetAsDBDate() : StringUtils::EmptyString);
+  sortable[FieldTvShowTitle] = m_strShowTitle;
+  sortable[FieldAlbum] = m_strAlbum;
+  sortable[FieldArtist] = m_artist;
+  sortable[FieldPlaycount] = m_playCount;
+  sortable[FieldLastPlayed] = m_lastPlayed.IsValid() ? m_lastPlayed.GetAsDBDateTime() : StringUtils::EmptyString;
+  sortable[FieldTop250] = m_iTop250;
+  sortable[FieldYear] = m_iYear;
+  sortable[FieldSeason] = m_iSeason;
+  sortable[FieldEpisodeNumber] = m_iEpisode;
+  sortable[FieldEpisodeNumberSpecialSort] = m_iSpecialSortEpisode;
+  sortable[FieldSeasonSpecialSort] = m_iSpecialSortSeason;
+  sortable[FieldRating] = m_fRating;
+  sortable[FieldId] = m_iDbId;
+  sortable[FieldTrackNumber] = m_iTrack;
+  sortable[FieldTag] = m_tags;
+
+  sortable[FieldTime] = m_streamDetails.GetVideoDuration();
+  sortable[FieldVideoResolution] = m_streamDetails.GetVideoHeight();
+  sortable[FieldVideoAspectRatio] = m_streamDetails.GetVideoAspect();
+  sortable[FieldVideoCodec] = m_streamDetails.GetVideoCodec();
+  
+  sortable[FieldAudioChannels] = m_streamDetails.GetAudioChannels();
+  sortable[FieldAudioCodec] = m_streamDetails.GetAudioCodec();
+  sortable[FieldAudioLanguage] = m_streamDetails.GetAudioLanguage();
+  
+  sortable[FieldSubtitleLanguage] = m_streamDetails.GetSubtitleLanguage();
+
+  sortable[FieldInProgress] = m_resumePoint.IsPartWay();
+  sortable[FieldDateAdded] = m_dateAdded.IsValid() ? m_dateAdded.GetAsDBDateTime() : StringUtils::EmptyString;
+  sortable[FieldMediaType] = DatabaseUtils::MediaTypeFromString(m_type);
 }
 
 const CStdString CVideoInfoTag::GetCast(bool bIncludeRole /*= false*/) const
@@ -600,7 +658,8 @@ void CVideoInfoTag::ParseNative(const TiXmlElement* movie, bool prioritise)
     node = node->NextSiblingElement("actor");
   }
 
-  XMLUtils::GetStringArray(movie, "set", m_set, prioritise, g_advancedSettings.m_videoItemSeparator);
+  XMLUtils::GetString(movie, "set", m_strSet);
+  XMLUtils::GetStringArray(movie, "tag", m_tags, prioritise, g_advancedSettings.m_videoItemSeparator);
   XMLUtils::GetStringArray(movie, "studio", m_studio, prioritise, g_advancedSettings.m_videoItemSeparator);
   // artists
   node = movie->FirstChildElement("artist");

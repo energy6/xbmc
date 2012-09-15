@@ -28,6 +28,8 @@
 #include "threads/Event.h"
 #include <boost/shared_ptr.hpp>
 
+#include "PlatformDefs.h"
+
 #include <queue>
 
 class CFileItem;
@@ -35,6 +37,12 @@ class CFileItemList;
 class CGUIDialog;
 class CGUIWindow;
 class CGUIMessage;
+class CVideoInfoTag;
+
+namespace MUSIC_INFO
+{
+  class CMusicInfoTag;
+}
 
 // defines here
 #define TMSG_DIALOG_DOMODAL       100
@@ -60,6 +68,7 @@ class CGUIMessage;
 #define TMSG_PLAYLISTPLAYER_REMOVE 219
 #define TMSG_PLAYLISTPLAYER_SWAP 223
 #define TMSG_PLAYLISTPLAYER_REPEAT 224
+#define TMSG_UPDATE_CURRENT_ITEM 225
 
 #define TMSG_PICTURE_SHOW         220
 #define TMSG_PICTURE_SLIDESHOW    221
@@ -100,6 +109,9 @@ class CGUIMessage;
 #define TMSG_VOLUME_SHOW          900
 #define TMSG_SPLASH_MESSAGE       901
 
+#define TMSG_DISPLAY_SETUP      1000
+#define TMSG_DISPLAY_DESTROY    1001
+
 typedef struct
 {
   DWORD dwMessage;
@@ -131,9 +143,12 @@ struct ThreadMessageCallback
 
 class CApplicationMessenger
 {
-
 public:
-  ~CApplicationMessenger();
+  /*!
+   \brief The only way through which the global instance of the CApplicationMessenger should be accessed.
+   \return the global instance.
+   */
+  static CApplicationMessenger& Get();
 
   void Cleanup();
   // if a message has to be send to the gui, use MSG_TYPE_WINDOW instead
@@ -183,6 +198,12 @@ public:
   void Minimize(bool wait = false);
   void ExecOS(const CStdString command, bool waitExit = false);
   void UserEvent(int code);
+  //! \brief Set the tag for the currently playing song
+  void SetCurrentSongTag(const MUSIC_INFO::CMusicInfoTag& tag);
+  //! \brief Set the tag for the currently playing video
+  void SetCurrentVideoTag(const CVideoInfoTag& tag);
+  //! \brief Set the currently currently item
+  void SetCurrentItem(const CFileItem& item);
 
   CStdString GetResponse();
   int SetResponse(CStdString response);
@@ -212,15 +233,21 @@ public:
 
   void SetSplashMessage(const CStdString& message);
   void SetSplashMessage(int stringID);
+  
+  bool SetupDisplay();
+  bool DestroyDisplay();
 
 private:
+  // private construction, and no assignements; use the provided singleton methods
+  CApplicationMessenger();
+  CApplicationMessenger(const CApplicationMessenger&);
+  CApplicationMessenger const& operator=(CApplicationMessenger const&);
+  virtual ~CApplicationMessenger();
   void ProcessMessage(ThreadMessage *pMsg);
-
 
   std::queue<ThreadMessage*> m_vecMessages;
   std::queue<ThreadMessage*> m_vecWindowMessages;
   CCriticalSection m_critSection;
   CCriticalSection m_critBuffer;
   CStdString bufferResponse;
-
 };

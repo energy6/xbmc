@@ -1,7 +1,7 @@
 #pragma once
 
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -78,6 +78,7 @@ namespace PVR
 
     virtual const char *GetName(void) const;
     virtual PVRWindow GetWindowId(void) const { return m_window; }
+    virtual bool IsFocused(void) const;
     virtual bool IsVisible(void) const;
     virtual bool IsActive(void) const;
     virtual bool IsSavedView(void) const;
@@ -89,7 +90,7 @@ namespace PVR
     virtual bool OnContextButton(int itemNumber, CONTEXT_BUTTON button);
 
     virtual void GetContextButtons(int itemNumber, CContextButtons &buttons) const = 0;
-    virtual void UpdateData(void) = 0;
+    virtual void UpdateData(bool bUpdateSelectedFile = true) = 0;
     virtual void SetInvalid(void);
 
     virtual void OnInitWindow(void);
@@ -134,7 +135,7 @@ namespace PVR
     unsigned int     m_iControlList;
     bool             m_bUpdateRequired;
     int              m_iSelected;
-    SORT_ORDER       m_iSortOrder;
+    SortOrder        m_iSortOrder;
     SORT_METHOD      m_iSortMethod;
     CCriticalSection m_critSection;
   };

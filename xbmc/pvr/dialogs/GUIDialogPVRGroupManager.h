@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2005-2010 Team XBMC
+ *      Copyright (C) 2012 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -22,13 +22,12 @@
 
 #include "guilib/GUIDialog.h"
 #include "GUIViewControl.h"
+#include "../channels/PVRChannelGroup.h"
 
 class CFileItemList;
 
 namespace PVR
 {
-  class CPVRChannelGroup;
-
   class CGUIDialogPVRGroupManager : public CGUIDialog
   {
   public:
@@ -55,7 +54,7 @@ namespace PVR
     bool ActionButtonChannelGroups(CGUIMessage &message);
     bool OnMessageClick(CGUIMessage &message);
 
-    CPVRChannelGroup *m_selectedGroup;
+    CPVRChannelGroupPtr m_selectedGroup;
     bool              m_bIsRadio;
 
     unsigned int      m_iSelectedUngroupedChannel;
