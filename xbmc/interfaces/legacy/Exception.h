@@ -28,11 +28,11 @@
 #include "utils/StdString.h"
 #include "commons/Exception.h"
 
-#define __PRETTY_FUNCTION__ __FUNCTION__
-
 #ifndef SWIG
 namespace XBMCAddon
 {
+  XBMCCOMMONS_STANDARD_EXCEPTION(WrongTypeException);
+
   /**
    * UnimplementedException Can be used in places like the 
    *  Control hierarchy where the

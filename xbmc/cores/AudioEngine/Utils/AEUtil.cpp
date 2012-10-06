@@ -37,7 +37,8 @@ unsigned int CAEUtil::m_seed = (unsigned int)(CurrentHostCounter() / 1000.0f);
 
 CAEChannelInfo CAEUtil::GuessChLayout(const unsigned int channels)
 {
-  CLog::Log(LOGWARNING, "CAEUtil::GuessChLayout - This method should really never be used, please fix the code that called this");
+  CLog::Log(LOGWARNING, "CAEUtil::GuessChLayout - "
+    "This method should really never be used, please fix the code that called this");
 
   CAEChannelInfo result;
   if (channels < 1 || channels > 8)
@@ -102,12 +103,12 @@ const unsigned int CAEUtil::DataFormatToBits(const enum AEDataFormat dataFormat)
     sizeof(double) << 3, /* DOUBLE */
     sizeof(float ) << 3, /* FLOAT  */
 
-    8,                   /* AAC    */
-    8,                   /* AC3    */
-    8,                   /* DTS    */
-    8,                   /* EAC3   */
-    8,                   /* TRUEHD */
-    8,                   /* DTS-HD */
+    16,                  /* AAC    */
+    16,                  /* AC3    */
+    16,                  /* DTS    */
+    16,                  /* EAC3   */
+    16,                  /* TRUEHD */
+    16,                  /* DTS-HD */
     32                   /* LPCM   */
   };
 

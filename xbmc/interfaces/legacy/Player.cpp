@@ -57,7 +57,10 @@ namespace XBMCAddon
 
       // we're shutting down so unregister me.
       if (languageHook)
+      {
+        DelayedCallGuard dc;
         languageHook->unregisterPlayerCallback(this);
+      }
     }
 
     void Player::playStream(const String& item, const xbmcgui::ListItem* plistitem, bool windowed)
@@ -207,6 +210,24 @@ namespace XBMCAddon
       invokeCallback(new CallbackFunction<Player>(this,&Player::onQueueNextItem));
     }
 
+    void Player::OnPlayBackSpeedChanged(int speed)
+    { 
+      TRACE;
+      invokeCallback(new CallbackFunction<Player,int>(this,&Player::onPlayBackSpeedChanged,speed));
+    }
+
+    void Player::OnPlayBackSeek(int time, int seekOffset)
+    { 
+      TRACE;
+      invokeCallback(new CallbackFunction<Player,int,int>(this,&Player::onPlayBackSeek,time,seekOffset));
+    }
+
+    void Player::OnPlayBackSeekChapter(int chapter)
+    { 
+      TRACE;
+      invokeCallback(new CallbackFunction<Player,int>(this,&Player::onPlayBackSeekChapter,chapter));
+    }
+
     void Player::onPlayBackStarted()
     {
       TRACE;
@@ -234,6 +255,21 @@ namespace XBMCAddon
 
     void Player::onQueueNextItem()
     {
+      TRACE;
+    }
+
+    void Player::onPlayBackSpeedChanged(int speed)
+    { 
+      TRACE;
+    }
+
+    void Player::onPlayBackSeek(int time, int seekOffset)
+    { 
+      TRACE;
+    }
+
+    void Player::onPlayBackSeekChapter(int chapter)
+    { 
       TRACE;
     }
 
