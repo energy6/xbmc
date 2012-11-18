@@ -189,8 +189,8 @@ void* CAirTunesServer::AudioOutputFunctions::audio_init(void *cls, int bits, int
 
 void  CAirTunesServer::AudioOutputFunctions::audio_set_volume(void *cls, void *session, float volume)
 {
-  //volume from -144 - 0
-  float volPercent = 1 - volume/-144;
+  //volume from -30 - 0 - -144 means mute
+  float volPercent = volume < -30.0f ? 0 : 1 - volume/-30;
   g_application.SetVolume(volPercent, false);//non-percent volume 0.0-1.0
 }
 
@@ -355,9 +355,6 @@ ao_device* CAirTunesServer::AudioOutputFunctions::ao_open_live(int driver_id, ao
 
   if (ao_get_option(option, "name"))
     item.GetMusicInfoTag()->SetTitle(ao_get_option(option, "name"));
-
-  ThreadMessage tMsg2 = { TMSG_GUI_ACTIVATE_WINDOW, WINDOW_VISUALISATION, 0 };
-  CApplicationMessenger::Get().SendMessage(tMsg2, true);
 
   CApplicationMessenger::Get().PlayFile(item);
 

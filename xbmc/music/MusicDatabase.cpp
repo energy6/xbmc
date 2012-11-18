@@ -450,8 +450,7 @@ int CMusicDatabase::AddAlbum(const CStdString& strAlbum1, const CStdString &strA
   try
   {
     CStdString strAlbum=strAlbum1;
-    strAlbum.TrimLeft(" ");
-    strAlbum.TrimRight(" ");
+    strAlbum.Trim();
 
     if (NULL == m_pDB.get()) return -1;
     if (NULL == m_pDS.get()) return -1;
@@ -513,8 +512,7 @@ int CMusicDatabase::AddGenre(const CStdString& strGenre1)
   try
   {
     CStdString strGenre = strGenre1;
-    strGenre.TrimLeft(" ");
-    strGenre.TrimRight(" ");
+    strGenre.Trim();
 
     if (strGenre.IsEmpty())
       strGenre=g_localizeStrings.Get(13205); // Unknown
@@ -563,8 +561,7 @@ int CMusicDatabase::AddArtist(const CStdString& strArtist1)
   try
   {
     CStdString strArtist = strArtist1;
-    strArtist.TrimLeft(" ");
-    strArtist.TrimRight(" ");
+    strArtist.Trim();
 
     if (strArtist.IsEmpty())
       strArtist=g_localizeStrings.Get(13205); // Unknown
@@ -2178,8 +2175,10 @@ int CMusicDatabase::Cleanup(CGUIDialogProgress *pDlgProgress)
   if (NULL == m_pDB.get()) return ERROR_DATABASE;
   if (NULL == m_pDS.get()) return ERROR_DATABASE;
 
+  int ret = ERROR_OK;
   unsigned int time = XbmcThreads::SystemClockMillis();
   CLog::Log(LOGNOTICE, "%s: Starting musicdatabase cleanup ..", __FUNCTION__);
+  ANNOUNCEMENT::CAnnouncementManager::Announce(ANNOUNCEMENT::AudioLibrary, "xbmc", "OnCleanStarted");
 
   // first cleanup any songs with invalid paths
   if (pDlgProgress)
@@ -2194,8 +2193,8 @@ int CMusicDatabase::Cleanup(CGUIDialogProgress *pDlgProgress)
   }
   if (!CleanupSongs())
   {
-    RollbackTransaction();
-    return ERROR_REORG_SONGS;
+    ret = ERROR_REORG_SONGS;
+    goto error;
   }
   // then the albums that are not linked to a song or to albuminfo, or whose path is removed
   if (pDlgProgress)
@@ -2206,8 +2205,8 @@ int CMusicDatabase::Cleanup(CGUIDialogProgress *pDlgProgress)
   }
   if (!CleanupAlbums())
   {
-    RollbackTransaction();
-    return ERROR_REORG_ALBUM;
+    ret = ERROR_REORG_ALBUM;
+    goto error;
   }
   // now the paths
   if (pDlgProgress)
@@ -2218,8 +2217,8 @@ int CMusicDatabase::Cleanup(CGUIDialogProgress *pDlgProgress)
   }
   if (!CleanupPaths())
   {
-    RollbackTransaction();
-    return ERROR_REORG_PATH;
+    ret = ERROR_REORG_PATH;
+    goto error;
   }
   // and finally artists + genres
   if (pDlgProgress)
@@ -2230,8 +2229,8 @@ int CMusicDatabase::Cleanup(CGUIDialogProgress *pDlgProgress)
   }
   if (!CleanupArtists())
   {
-    RollbackTransaction();
-    return ERROR_REORG_ARTIST;
+    ret = ERROR_REORG_ARTIST;
+    goto error;
   }
   if (pDlgProgress)
   {
@@ -2241,8 +2240,8 @@ int CMusicDatabase::Cleanup(CGUIDialogProgress *pDlgProgress)
   }
   if (!CleanupGenres())
   {
-    RollbackTransaction();
-    return ERROR_REORG_GENRE;
+    ret = ERROR_REORG_GENRE;
+    goto error;
   }
   // commit transaction
   if (pDlgProgress)
@@ -2253,8 +2252,8 @@ int CMusicDatabase::Cleanup(CGUIDialogProgress *pDlgProgress)
   }
   if (!CommitTransaction())
   {
-    RollbackTransaction();
-    return ERROR_WRITING_CHANGES;
+    ret = ERROR_WRITING_CHANGES;
+    goto error;
   }
   // and compress the database
   if (pDlgProgress)
@@ -2265,12 +2264,18 @@ int CMusicDatabase::Cleanup(CGUIDialogProgress *pDlgProgress)
   }
   time = XbmcThreads::SystemClockMillis() - time;
   CLog::Log(LOGNOTICE, "%s: Cleaning musicdatabase done. Operation took %s", __FUNCTION__, StringUtils::SecondsToTimeString(time / 1000).c_str());
+  ANNOUNCEMENT::CAnnouncementManager::Announce(ANNOUNCEMENT::AudioLibrary, "xbmc", "OnCleanFinished");
 
   if (!Compress(false))
   {
     return ERROR_COMPRESSING;
   }
   return ERROR_OK;
+
+error:
+  RollbackTransaction();
+  ANNOUNCEMENT::CAnnouncementManager::Announce(ANNOUNCEMENT::AudioLibrary, "xbmc", "OnCleanFinished");
+  return ret;
 }
 
 void CMusicDatabase::DeleteAlbumInfo()
@@ -2566,7 +2571,8 @@ bool CMusicDatabase::GetGenresNav(const CStdString& strBaseDir, CFileItemList& i
 
     Filter extFilter = filter;
     CMusicDbUrl musicUrl;
-    if (!musicUrl.FromString(strBaseDir) || !GetFilter(musicUrl, extFilter))
+    SortDescription sorting;
+    if (!musicUrl.FromString(strBaseDir) || !GetFilter(musicUrl, extFilter, sorting))
       return false;
 
     // if there are extra WHERE conditions we might need access
@@ -2743,8 +2749,6 @@ bool CMusicDatabase::GetCommonNav(const CStdString &strBaseDir, const CStdString
     CMusicDbUrl musicUrl;
     if (!BuildSQL(strBaseDir, strSQL, extFilter, strSQL, musicUrl))
       return false;
-
-    items.SetPath(musicUrl.ToString());
     
     strSQL = PrepareSQL(strSQL, !extFilter.fields.empty() ? extFilter.fields.c_str() : labelField.c_str());
     
@@ -2858,7 +2862,8 @@ bool CMusicDatabase::GetArtistsByWhere(const CStdString& strBaseDir, const Filte
 
     Filter extFilter = filter;
     CMusicDbUrl musicUrl;
-    if (!musicUrl.FromString(strBaseDir) || !GetFilter(musicUrl, extFilter))
+    SortDescription sorting = sortDescription;
+    if (!musicUrl.FromString(strBaseDir) || !GetFilter(musicUrl, extFilter, sorting))
       return false;
 
     // if there are extra WHERE conditions we might need access
@@ -2891,8 +2896,6 @@ bool CMusicDatabase::GetArtistsByWhere(const CStdString& strBaseDir, const Filte
     CStdString strSQLExtra;
     if (!BuildSQL(strSQLExtra, extFilter, strSQLExtra))
       return false;
-
-    items.SetPath(musicUrl.ToString());
 
     // Apply the limiting directly here if there's no special sorting but limiting
     if (extFilter.limit.empty() &&
@@ -3071,7 +3074,8 @@ bool CMusicDatabase::GetAlbumsByWhere(const CStdString &baseDir, const Filter &f
 
     Filter extFilter = filter;
     CMusicDbUrl musicUrl;
-    if (!musicUrl.FromString(baseDir) || !GetFilter(musicUrl, extFilter))
+    SortDescription sorting = sortDescription;
+    if (!musicUrl.FromString(baseDir) || !GetFilter(musicUrl, extFilter, sorting))
       return false;
 
     // if there are extra WHERE conditions we might need access
@@ -3085,8 +3089,6 @@ bool CMusicDatabase::GetAlbumsByWhere(const CStdString &baseDir, const Filter &f
     CStdString strSQLExtra;
     if (!BuildSQL(strSQLExtra, extFilter, strSQLExtra))
       return false;
-
-    items.SetPath(musicUrl.ToString());
 
     // Apply the limiting directly here if there's no special sorting but limiting
     if (extFilter.limit.empty() &&
@@ -3185,7 +3187,8 @@ bool CMusicDatabase::GetSongsByWhere(const CStdString &baseDir, const Filter &fi
 
     Filter extFilter = filter;
     CMusicDbUrl musicUrl;
-    if (!musicUrl.FromString(baseDir) || !GetFilter(musicUrl, extFilter))
+    SortDescription sorting = sortDescription;
+    if (!musicUrl.FromString(baseDir) || !GetFilter(musicUrl, extFilter, sorting))
       return false;
 
     // if there are extra WHERE conditions we might need access
@@ -3199,8 +3202,6 @@ bool CMusicDatabase::GetSongsByWhere(const CStdString &baseDir, const Filter &fi
     CStdString strSQLExtra;
     if (!BuildSQL(strSQLExtra, extFilter, strSQLExtra))
       return false;
-
-    items.SetPath(musicUrl.ToString());
 
     // Apply the limiting directly here if there's no special sorting but limiting
     if (extFilter.limit.empty() &&
@@ -3640,6 +3641,37 @@ bool CMusicDatabase::UpdateOldVersion(int version)
     g_settings.Save();
   }
 
+  if (version < 29)
+  { // update old art URLs
+    m_pDS->query("select art_id,url from art where url like 'image://%%'");
+    vector< pair<int, string> > art;
+    while (!m_pDS->eof())
+    {
+      art.push_back(make_pair(m_pDS->fv(0).get_asInt(), CURL(m_pDS->fv(1).get_asString()).Get()));
+      m_pDS->next();
+    }
+    m_pDS->close();
+    for (vector< pair<int, string> >::iterator i = art.begin(); i != art.end(); ++i)
+      m_pDS->exec(PrepareSQL("update art set url='%s' where art_id=%d", i->second.c_str(), i->first));
+  }
+  if (version < 30)
+  { // update URL encoded paths
+    m_pDS->query("select idSong, strFileName from song");
+    vector< pair<int, string> > files;
+    while (!m_pDS->eof())
+    {
+      files.push_back(make_pair(m_pDS->fv(0).get_asInt(), m_pDS->fv(1).get_asString()));
+      m_pDS->next();
+    }
+    m_pDS->close();
+
+    for (vector< pair<int, string> >::iterator i = files.begin(); i != files.end(); ++i)
+    {
+      std::string filename = i->second;
+      if (URIUtils::UpdateUrlEncoding(filename))
+        m_pDS->exec(PrepareSQL("UPDATE song SET strFileName='%s' WHERE idSong=%d", filename.c_str(), i->first));
+    }
+  }
   // always recreate the views after any table change
   CreateViews();
 
@@ -5119,6 +5151,10 @@ void CMusicDatabase::SetArtForItem(int mediaId, const string &mediaType, const s
     if (NULL == m_pDB.get()) return;
     if (NULL == m_pDS.get()) return;
 
+    // don't set <foo>.<bar> art types - these are derivative types from parent items
+    if (artType.find('.') != string::npos)
+      return;
+
     CStdString sql = PrepareSQL("SELECT art_id FROM art WHERE media_id=%i AND media_type='%s' AND type='%s'", mediaId, mediaType.c_str(), artType.c_str());
     m_pDS->query(sql.c_str());
     if (!m_pDS->eof())
@@ -5201,7 +5237,7 @@ string CMusicDatabase::GetArtistArtForItem(int mediaId, const string &mediaType,
   return GetSingleValue(query, m_pDS2);
 }
 
-bool CMusicDatabase::GetFilter(CDbUrl &musicUrl, Filter &filter)
+bool CMusicDatabase::GetFilter(CDbUrl &musicUrl, Filter &filter, SortDescription &sorting)
 {
   if (!musicUrl.IsValid())
     return false;
@@ -5379,10 +5415,18 @@ bool CMusicDatabase::GetFilter(CDbUrl &musicUrl, Filter &filter)
       return false;
 
     // check if the filter playlist matches the item type
-    if (xsp.GetType() != "artists"|| xsp.GetType()  == type)
+    if (xsp.GetType() != "artists" || xsp.GetType()  == type)
     {
       std::set<CStdString> playlists;
       filter.AppendWhere(xsp.GetWhereClause(*this, playlists));
+
+      if (xsp.GetLimit() > 0)
+        sorting.limitEnd = xsp.GetLimit();
+      if (xsp.GetOrder() != SortByNone)
+        sorting.sortBy = xsp.GetOrder();
+      sorting.sortOrder = xsp.GetOrderAscending() ? SortOrderAscending : SortOrderDescending;
+      if (g_guiSettings.GetBool("filelists.ignorethewhensorting"))
+        sorting.sortAttributes = SortAttributeIgnoreArticle;
     }
   }
 

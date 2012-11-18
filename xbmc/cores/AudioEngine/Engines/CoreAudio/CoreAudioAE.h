@@ -24,7 +24,7 @@
 
 #include "system.h"
 
-#include "Interfaces/AE.h"
+#include "cores/AudioEngine/Interfaces/AE.h"
 #include "ICoreAudioAEHAL.h"
 #include "ICoreAudioSource.h"
 #include "CoreAudioAEStream.h"
@@ -72,7 +72,7 @@ public:
   virtual void      Shutdown();
 
   virtual bool      Initialize();
-  virtual void      OnSettingsChange(std::string setting);
+  virtual void      OnSettingsChange(const std::string& setting);
 
   virtual bool      Suspend(); /* Suspend output and de-initialize "hog-mode" sink for external players and power savings */
   virtual bool      Resume();  /* Resume ouput and re-initialize sink after Suspend() above */
@@ -148,6 +148,9 @@ private:
   bool              m_callbackRunning;
 
   AEAudioFormat     m_format;
+  enum AEDataFormat m_lastStreamFormat;
+  unsigned int      m_lastChLayoutCount;
+  unsigned int      m_lastSampleRate;
   unsigned int      m_chLayoutCount;
   bool              m_rawPassthrough;
 

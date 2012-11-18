@@ -2529,6 +2529,12 @@
     <ClCompile Include="..\..\xbmc\pictures\PictureThumbLoader.cpp">
       <Filter>pictures</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\xbmc\music\MusicThumbLoader.cpp">
+      <Filter>music</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\xbmc\video\VideoThumbLoader.cpp">
+      <Filter>video</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\xbmc\dbwrappers\Database.cpp">
       <Filter>dbwrappers</Filter>
     </ClCompile>
@@ -2574,6 +2580,9 @@
     </ClCompile>
     <ClCompile Include="..\..\xbmc\filesystem\VideoDatabaseDirectory\DirectoryNodeTags.cpp">
       <Filter>filesystem\VideoDatabaseDirectory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\xbmc\utils\EdenVideoArtUpdater.cpp">
+      <Filter>utils</Filter>
     </ClCompile>
     <ClCompile Include="..\..\xbmc\utils\EndianSwap.cpp">
       <Filter>utils</Filter>
@@ -2923,6 +2932,21 @@
     </ClCompile>
     <ClCompile Include="..\..\xbmc\test\TestFileItem.cpp">
       <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\xbmc\test\TestTextureCache.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\xbmc\interfaces\json-rpc\PVROperations.cpp">
+      <Filter>interfaces\json-rpc</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\xbmc\filesystem\HTTPFile.cpp">
+      <Filter>filesystem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\xbmc\utils\GroupUtils.cpp">
+      <Filter>utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\xbmc\cores\AudioEngine\Utils\AELimiter.cpp">
+      <Filter>cores\AudioEngine\Utils</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -4395,6 +4419,9 @@
     <ClInclude Include="..\..\xbmc\utils\DownloadQueueManager.h">
       <Filter>utils</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\xbmc\utils\EdenVideoArtUpdater.h">
+      <Filter>utils</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\xbmc\utils\EndianSwap.h">
       <Filter>utils</Filter>
     </ClInclude>
@@ -5475,6 +5502,12 @@
     <ClInclude Include="..\..\xbmc\pictures\PictureThumbLoader.h">
       <Filter>pictures</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\xbmc\music\MusicThumbLoader.h">
+      <Filter>music</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\xbmc\video\VideoThumbLoader.h">
+      <Filter>video</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\xbmc\dbwrappers\Database.h">
       <Filter>dbwrappers</Filter>
     </ClInclude>
@@ -5715,6 +5748,18 @@
     </ClInclude>
     <ClInclude Include="..\..\xbmc\dialogs\GUIDialogMediaFilter.h">
       <Filter>dialogs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\xbmc\interfaces\json-rpc\PVROperations.h">
+      <Filter>interfaces\json-rpc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\xbmc\filesystem\HTTPFile.h">
+      <Filter>filesystem</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\xbmc\utils\GroupUtils.h">
+      <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\xbmc\cores\AudioEngine\Utils\AELimiter.h">
+      <Filter>cores\AudioEngine\Utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

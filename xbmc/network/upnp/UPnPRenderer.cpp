@@ -90,6 +90,8 @@ CUPnPRenderer::SetupServices()
         ",http-get:*:audio/ac3:*"
         ",http-get:*:audio/vorbis:*"
         ",http-get:*:audio/speex:*"
+        ",http-get:*:audio/flac:*"
+        ",http-get:*:audio/x-flac:*"
         ",http-get:*:audio/x-aiff:*"
         ",http-get:*:audio/x-pn-realaudio:*"
         ",http-get:*:audio/x-realaudio:*"
@@ -325,10 +327,10 @@ CUPnPRenderer::SetupIcons()
 {
     NPT_String file_root = CSpecialProtocol::TranslatePath("special://xbmc/media/").c_str();
     AddIcon(
-        PLT_DeviceIcon("image/png", 256, 256, 32, "/icon.png"),
+        PLT_DeviceIcon("image/png", 256, 256, 24, "/icon-flat-256x256.png"),
         file_root);
     AddIcon(
-        PLT_DeviceIcon("image/png", 32, 32, 32, "/icon32x32.png"),
+        PLT_DeviceIcon("image/png", 120, 120, 24, "/icon-flat-120x120.png"),
         file_root);
     return NPT_SUCCESS;
 }

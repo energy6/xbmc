@@ -268,7 +268,7 @@ public:
    */
   std::string GetArtistArtForItem(int mediaId, const std::string &mediaType, const std::string &artType);
 
-  virtual bool GetFilter(CDbUrl &musicUrl, Filter &filter);
+  virtual bool GetFilter(CDbUrl &musicUrl, Filter &filter, SortDescription &sorting);
 
 protected:
   std::map<CStdString, int> m_artistCache;
@@ -278,7 +278,7 @@ protected:
   std::map<CStdString, CAlbum> m_albumCache;
 
   virtual bool CreateTables();
-  virtual int GetMinVersion() const { return 28; };
+  virtual int GetMinVersion() const { return 30; };
   const char *GetBaseDBName() const { return "MyMusic"; };
 
   int AddSong(const CSong& song, bool bCheck = true, int idAlbum = -1);

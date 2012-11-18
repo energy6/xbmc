@@ -31,6 +31,10 @@
 #include "settings/GUISettings.h"
 #include "utils/URIUtils.h"
 
+#define PROPERTY_PATH_DB            "path.db"
+#define PROPERTY_SORT_ORDER         "sort.order"
+#define PROPERTY_SORT_ASCENDING     "sort.ascending"
+
 namespace XFILE
 {
   CSmartPlaylistDirectory::CSmartPlaylistDirectory()
@@ -47,7 +51,11 @@ namespace XFILE
     CSmartPlaylist playlist;
     if (!playlist.Load(strPath))
       return false;
-    return GetDirectory(playlist, items);
+    bool result = GetDirectory(playlist, items);
+    if (result)
+      items.SetProperty("library.smartplaylist", true);
+    
+    return result;
   }
   
   bool CSmartPlaylistDirectory::GetDirectory(const CSmartPlaylist &playlist, CFileItemList& items, const CStdString &strBaseDir /* = "" */, bool filter /* = false */)
@@ -98,24 +106,22 @@ namespace XFILE
 
         // store the smartplaylist as JSON in the URL as well
         CStdString xsp;
-        if (!playlist.IsEmpty())
+        if (!playlist.IsEmpty(filter))
         {
-          if (!playlist.SaveAsJson(xsp, false))
+          if (!playlist.SaveAsJson(xsp, !filter))
             return false;
         }
         videoUrl.AddOption(option, xsp);
         
         CDatabase::Filter dbfilter;
-        success = db.GetSortedVideos(mediaType, videoUrl.ToString(), sorting, items, dbfilter, true);
+        success = db.GetSortedVideos(mediaType, videoUrl.ToString(), sorting, items, dbfilter);
+        db.Close();
 
         // if we retrieve a list of episodes and we didn't receive
         // a pre-defined base path, we need to fix it
         if (strBaseDir.empty() && mediaType == MediaTypeEpisode)
-        {
           videoUrl.AppendPath("-1/-1/");
-          items.SetPath(videoUrl.ToString());
-        }
-        db.Close();
+        items.SetProperty(PROPERTY_PATH_DB, videoUrl.ToString());
       }
     }
     else if (playlist.GetType().Equals("albums"))
@@ -129,17 +135,18 @@ namespace XFILE
 
         // store the smartplaylist as JSON in the URL as well
         CStdString xsp;
-        if (!playlist.IsEmpty())
+        if (!playlist.IsEmpty(filter))
         {
-          if (!playlist.SaveAsJson(xsp, false))
+          if (!playlist.SaveAsJson(xsp, !filter))
             return false;
         }
         musicUrl.AddOption(option, xsp);
 
         CDatabase::Filter dbfilter;
         success = db.GetAlbumsByWhere(musicUrl.ToString(), dbfilter, items, sorting);
-        items.SetContent("albums");
         db.Close();
+        items.SetContent("albums");
+        items.SetProperty(PROPERTY_PATH_DB, musicUrl.ToString());
       }
     }
     else if (playlist.GetType().Equals("artists"))
@@ -153,17 +160,18 @@ namespace XFILE
 
         // store the smartplaylist as JSON in the URL as well
         CStdString xsp;
-        if (!playlist.IsEmpty())
+        if (!playlist.IsEmpty(filter))
         {
-          if (!playlist.SaveAsJson(xsp, false))
+          if (!playlist.SaveAsJson(xsp, !filter))
             return false;
         }
         musicUrl.AddOption(option, xsp);
 
-        CDatabase::Filter filter;
-        success = db.GetArtistsByWhere(musicUrl.ToString(), filter, items, sorting);
-        items.SetContent("albums");
+        CDatabase::Filter dbfilter;
+        success = db.GetArtistsNav(musicUrl.ToString(), items, !g_guiSettings.GetBool("musiclibrary.showcompilationartists"), -1, -1, -1, dbfilter, sorting);
         db.Close();
+        items.SetContent("artists");
+        items.SetProperty(PROPERTY_PATH_DB, musicUrl.ToString());
       }
     }
 
@@ -182,17 +190,18 @@ namespace XFILE
 
         // store the smartplaylist as JSON in the URL as well
         CStdString xsp;
-        if (!songPlaylist.IsEmpty())
+        if (!songPlaylist.IsEmpty(filter))
         {
-          if (!songPlaylist.SaveAsJson(xsp, false))
+          if (!songPlaylist.SaveAsJson(xsp, !filter))
             return false;
         }
         musicUrl.AddOption(option, xsp);
 
         CDatabase::Filter dbfilter;
         success = db.GetSongsByWhere(musicUrl.ToString(), dbfilter, items, sorting);
-        items.SetContent("songs");
         db.Close();
+        items.SetContent("songs");
+        items.SetProperty(PROPERTY_PATH_DB, musicUrl.ToString());
       }
     }
     if (playlist.GetType().Equals("musicvideos") || playlist.GetType().Equals("mixed"))
@@ -210,9 +219,9 @@ namespace XFILE
 
         // store the smartplaylist as JSON in the URL as well
         CStdString xsp;
-        if (!mvidPlaylist.IsEmpty())
+        if (!mvidPlaylist.IsEmpty(filter))
         {
-          if (!mvidPlaylist.SaveAsJson(xsp, false))
+          if (!mvidPlaylist.SaveAsJson(xsp, !filter))
             return false;
         }
         videoUrl.AddOption(option, xsp);
@@ -229,9 +238,12 @@ namespace XFILE
           else
             items.SetContent("musicvideos");
         }
+        items.SetProperty(PROPERTY_PATH_DB, videoUrl.ToString());
       }
     }
     items.SetLabel(playlist.GetName());
+    items.SetProperty(PROPERTY_SORT_ORDER, (int)playlist.GetOrder());
+    items.SetProperty(PROPERTY_SORT_ASCENDING, playlist.GetOrderDirection() == SortOrderAscending);
 
     // go through and set the playlist order
     for (int i = 0; i < items.Size(); i++)

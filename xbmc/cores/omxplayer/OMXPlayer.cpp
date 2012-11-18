@@ -75,7 +75,7 @@
 #include "utils/JobManager.h"
 //#include "cores/AudioEngine/AEFactory.h"
 //#include "cores/AudioEngine/Utils/AEUtil.h"
-#include "xbmc/ThumbLoader.h"
+#include "video/VideoThumbLoader.h"
 
 #include "pvr/PVRManager.h"
 #include "pvr/channels/PVRChannel.h"
@@ -690,7 +690,7 @@ bool COMXPlayer::OpenDemuxStream()
   return true;
 }
 
-void COMXPlayer::OpenDefaultStreams()
+void COMXPlayer::OpenDefaultStreams(bool reset)
 {
   // bypass for DVDs. The DVD Navigator has already dictated which streams to open.
   if (m_pInputStream->IsStreamType(DVDSTREAM_TYPE_DVD))
@@ -704,7 +704,7 @@ void COMXPlayer::OpenDefaultStreams()
   valid   = false;
   for(OMXSelectionStreams::iterator it = streams.begin(); it != streams.end() && !valid; ++it)
   {
-    if(OpenVideoStream(it->id, it->source))
+    if(OpenVideoStream(it->id, it->source, reset))
       valid = true;;
   }
   if(!valid)
@@ -719,7 +719,7 @@ void COMXPlayer::OpenDefaultStreams()
 
   for(OMXSelectionStreams::iterator it = streams.begin(); it != streams.end() && !valid; ++it)
   {
-    if(OpenAudioStream(it->id, it->source))
+    if(OpenAudioStream(it->id, it->source, reset))
       valid = true;
   }
   if(!valid)
@@ -801,7 +801,7 @@ bool COMXPlayer::ReadPacket(DemuxPacket*& packet, CDemuxStream*& stream)
     {
         m_SelectionStreams.Clear(STREAM_NONE, STREAM_SOURCE_DEMUX);
         m_SelectionStreams.Update(m_pInputStream, m_pDemuxer);
-        OpenDefaultStreams();
+        OpenDefaultStreams(false);
         return true;
     }
 
@@ -915,9 +915,6 @@ bool COMXPlayer::IsBetterStream(COMXCurrentStream& current, CDemuxStream* stream
       return false;
 
     if(current.type == STREAM_SUBTITLE)
-      return false;
-
-    if(current.type == STREAM_TELETEXT)
       return false;
 
     if(current.id < 0)
@@ -2092,10 +2089,7 @@ void COMXPlayer::HandleMessages()
 
         // set flag to indicate we have finished a seeking request
         if(!msg.GetTrickPlay())
-        {
-          g_infoManager.m_performingSeek = false;
           g_infoManager.SetDisplayAfterSeek();
-        }
 
         // dvd's will issue a HOP_CHANNEL that we need to skip
         if(m_pInputStream->IsStreamType(DVDSTREAM_TYPE_DVD))
@@ -2146,14 +2140,14 @@ void COMXPlayer::HandleMessages()
               m_dvd.iSelectedAudioStream = -1;
               CloseAudioStream(false);
               // TODO : check //CloseVideoStream(false);
-              m_messenger.Put(new CDVDMsgPlayerSeek(GetTime(), true, true, true));
+              m_messenger.Put(new CDVDMsgPlayerSeek(GetTime(), true, true, true, true, true));
             }
           }
           else
           {
             CloseAudioStream(false);
             OpenAudioStream(st.id, st.source);
-            m_messenger.Put(new CDVDMsgPlayerSeek(GetTime(), true, true, true));
+            m_messenger.Put(new CDVDMsgPlayerSeek(GetTime(), true, true, true, true, true));
           }
         }
       }
@@ -2827,7 +2821,7 @@ void COMXPlayer::ToFFRW(int iSpeed)
   SetPlaySpeed(iSpeed * DVD_PLAYSPEED_NORMAL);
 }
 
-bool COMXPlayer::OpenAudioStream(int iStream, int source)
+bool COMXPlayer::OpenAudioStream(int iStream, int source, bool reset)
 {
   CLog::Log(LOGNOTICE, "Opening audio stream: %i source: %i", iStream, source);
 
@@ -2868,7 +2862,7 @@ bool COMXPlayer::OpenAudioStream(int iStream, int source)
     m_av_clock.SetSpeed(DVD_PLAYSPEED_NORMAL);
     m_av_clock.OMXSetSpeed(DVD_PLAYSPEED_NORMAL);
   }
-  else
+  else if (reset)
     m_player_audio.SendMessage(new CDVDMsg(CDVDMsg::GENERAL_RESET));
 
   /* store information about stream */
@@ -2887,7 +2881,7 @@ bool COMXPlayer::OpenAudioStream(int iStream, int source)
   return true;
 }
 
-bool COMXPlayer::OpenVideoStream(int iStream, int source)
+bool COMXPlayer::OpenVideoStream(int iStream, int source, bool reset)
 {
   CLog::Log(LOGNOTICE, "Opening video stream: %i source: %i", iStream, source);
 
@@ -2931,7 +2925,7 @@ bool COMXPlayer::OpenVideoStream(int iStream, int source)
     m_av_clock.SetSpeed(DVD_PLAYSPEED_NORMAL);
     m_av_clock.OMXSetSpeed(DVD_PLAYSPEED_NORMAL);
   }
-  else
+  else if (reset)
     m_player_video.SendMessage(new CDVDMsg(CDVDMsg::GENERAL_RESET));
 
   unsigned flags = 0;
@@ -3541,6 +3535,7 @@ bool COMXPlayer::OnAction(const CAction &action)
     {
       case ACTION_MOVE_UP:
       case ACTION_NEXT_ITEM:
+      case ACTION_CHANNEL_UP:
         m_messenger.Put(new CDVDMsg(CDVDMsg::PLAYER_CHANNEL_NEXT));
         g_infoManager.SetDisplayAfterSeek();
         ShowPVRChannelInfo();
@@ -3549,6 +3544,7 @@ bool COMXPlayer::OnAction(const CAction &action)
 
       case ACTION_MOVE_DOWN:
       case ACTION_PREV_ITEM:
+      case ACTION_CHANNEL_DOWN:
         m_messenger.Put(new CDVDMsg(CDVDMsg::PLAYER_CHANNEL_PREV));
         g_infoManager.SetDisplayAfterSeek();
         ShowPVRChannelInfo();
@@ -3794,18 +3790,6 @@ void COMXPlayer::UpdatePlayState(double timeout)
       state.recording = pChannel->IsRecording();
     }
 
-    if (m_pInputStream->IsStreamType(DVDSTREAM_TYPE_PVRMANAGER))
-    {
-      CDVDInputStreamPVRManager* pvrinputstream = static_cast<CDVDInputStreamPVRManager*>(m_pInputStream);
-      state.canpause = pvrinputstream->CanPause();
-      state.canseek = pvrinputstream->CanSeek();
-    }
-    else
-    {
-      state.canseek = GetTotalTime() > 0 ? true : false;
-      state.canpause = true;
-    }
-
     CDVDInputStream::IDisplayTime* pDisplayTime = dynamic_cast<CDVDInputStream::IDisplayTime*>(m_pInputStream);
     if (pDisplayTime && pDisplayTime->GetTotalTime() > 0)
     {
@@ -3820,6 +3804,18 @@ void COMXPlayer::UpdatePlayState(double timeout)
         state.time       = XbmcThreads::SystemClockMillis() - m_dvd.iDVDStillStartTime;
         state.time_total = m_dvd.iDVDStillTime;
       }
+    }
+
+    if (m_pInputStream->IsStreamType(DVDSTREAM_TYPE_PVRMANAGER))
+    {
+      CDVDInputStreamPVRManager* pvrinputstream = static_cast<CDVDInputStreamPVRManager*>(m_pInputStream);
+      state.canpause = pvrinputstream->CanPause();
+      state.canseek  = pvrinputstream->CanSeek();
+    }
+    else
+    {
+      state.canseek  = state.time_total > 0 ? true : false;
+      state.canpause = true;
     }
   }
 

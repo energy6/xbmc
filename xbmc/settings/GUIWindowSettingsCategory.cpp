@@ -72,7 +72,7 @@
 #endif
 #endif
 #if defined(TARGET_DARWIN_OSX)
-#include "XBMCHelper.h"
+#include "osx/XBMCHelper.h"
 #endif
 #include "network/GUIDialogAccessPoints.h"
 #include "filesystem/Directory.h"
@@ -783,20 +783,10 @@ void CGUIWindowSettingsCategory::UpdateSettings()
           pControl->SetEnabled(g_guiSettings.GetInt("audiooutput.mode") == AUDIO_HDMI);
       }
     }
-    else if (strSetting.Equals("audiooutput.guisoundmode"))
-    {
-      CAEFactory::SetSoundMode(g_guiSettings.GetInt("audiooutput.guisoundmode"));
-    }
-    else if (strSetting.Equals("musicplayer.crossfade"))
-    {
-      CGUIControl *pControl = (CGUIControl *)GetControl(pSettingControl->GetID());
-      if (pControl) pControl->SetEnabled(g_guiSettings.GetString("audiooutput.audiodevice").find("wasapi:") == CStdString::npos);
-    }
     else if (strSetting.Equals("musicplayer.crossfadealbumtracks"))
     {
       CGUIControl *pControl = (CGUIControl *)GetControl(pSettingControl->GetID());
-      if (pControl) pControl->SetEnabled(g_guiSettings.GetInt("musicplayer.crossfade") > 0 &&
-                                         g_guiSettings.GetString("audiooutput.audiodevice").find("wasapi:") == CStdString::npos);
+      if (pControl) pControl->SetEnabled(g_guiSettings.GetInt("musicplayer.crossfade") > 0);
     }
 #ifdef HAS_WEB_SERVER
     else if (strSetting.Equals("services.webserverusername") ||
@@ -974,6 +964,11 @@ void CGUIWindowSettingsCategory::UpdateSettings()
       CGUIControl *pControl = (CGUIControl *)GetControl(pSettingControl->GetID());
       pControl->SetEnabled(g_guiSettings.GetBool("lookandfeel.enablerssfeeds"));
     }
+    else if (strSetting.Equals("lookandfeel.skinsettings"))
+    {
+      CGUIControl *pControl = (CGUIControl *)GetControl(pSettingControl->GetID());
+      pControl->SetEnabled(g_SkinInfo->HasSkinFile("SkinSettings.xml"));
+    }
     else if (strSetting.Equals("videoplayer.pauseafterrefreshchange"))
     {
       CGUIControl *pControl = (CGUIControl *)GetControl(pSettingControl->GetID());
@@ -1023,7 +1018,7 @@ void CGUIWindowSettingsCategory::UpdateSettings()
   }
 
   g_guiSettings.SetChanged();
-  g_guiSettings.NotifyObservers(ObservableMessageGuiSettings, true);
+  g_guiSettings.NotifyObservers(ObservableMessageGuiSettings);
 }
 
 void CGUIWindowSettingsCategory::OnClick(CBaseSettingControl *pSettingControl)
@@ -1438,6 +1433,10 @@ void CGUIWindowSettingsCategory::OnSettingChanged(CBaseSettingControl *pSettingC
     g_audioManager.Enable(true);
     g_audioManager.Load();
   }
+  else if (strSetting.Equals("lookandfeel.skinsettings"))
+  {
+    g_windowManager.ActivateWindow(WINDOW_SKIN_SETTINGS);
+  }
   else if (strSetting.Equals("input.enablemouse"))
   {
     g_Mouse.SetEnabled(g_guiSettings.GetBool("input.enablemouse"));
@@ -1774,9 +1773,9 @@ void CGUIWindowSettingsCategory::OnSettingChanged(CBaseSettingControl *pSettingC
   else if (strSetting.Equals("pvrmanager.enabled"))
   {
     if (g_guiSettings.GetBool("pvrmanager.enabled"))
-      g_application.StartPVRManager();
+      CApplicationMessenger::Get().ExecBuiltIn("XBMC.StartPVRManager", false);
     else
-      g_application.StopPVRManager();
+      CApplicationMessenger::Get().ExecBuiltIn("XBMC.StopPVRManager", false);
   }
   else if (strSetting.Equals("masterlock.lockcode"))
   {
@@ -1944,6 +1943,10 @@ void CGUIWindowSettingsCategory::OnSettingChanged(CBaseSettingControl *pSettingC
        dialog->DoModal();
     }
   }
+  else if (strSetting.Equals("pvrclient.menuhook") && g_PVRManager.IsStarted())
+  {
+    g_PVRManager.Get().Clients()->ProcessMenuHooks(-1, PVR_MENUHOOK_SETTING);
+  }
   else if (strSetting.compare(0, 12, "audiooutput.") == 0)
   {
     if (strSetting.Equals("audiooutput.audiodevice"))
@@ -1962,6 +1965,10 @@ void CGUIWindowSettingsCategory::OnSettingChanged(CBaseSettingControl *pSettingC
       g_guiSettings.SetString("audiooutput.passthroughdevice", m_DigitalAudioSinkMap[pControl->GetCurrentLabel()]);
     }
 #endif
+    else if (strSetting.Equals("audiooutput.guisoundmode"))
+    {
+      CAEFactory::SetSoundMode(g_guiSettings.GetInt("audiooutput.guisoundmode"));
+    }
 
     CAEFactory::OnSettingsChange(strSetting);
   }
@@ -2054,7 +2061,6 @@ CGUIControl* CGUIWindowSettingsCategory::AddSetting(CSetting *pSetting, float wi
   {
     pControl = new CGUIEditControl(*m_pOriginalEdit);
     if (!pControl) return NULL;
-    ((CGUIEditControl *)pControl)->SettingsCategorySetTextAlign(XBFONT_CENTER_Y);
     ((CGUIEditControl *)pControl)->SetLabel(g_localizeStrings.Get(pSetting->GetLabel()));
     pControl->SetWidth(width);
     pSettingControl = new CEditSettingControl((CGUIEditControl *)pControl, iControlID, pSetting);
@@ -2063,7 +2069,6 @@ CGUIControl* CGUIWindowSettingsCategory::AddSetting(CSetting *pSetting, float wi
   {
     pControl = new CGUIButtonControl(*m_pOriginalButton);
     if (!pControl) return NULL;
-    ((CGUIButtonControl *)pControl)->SettingsCategorySetTextAlign(XBFONT_CENTER_Y);
     ((CGUIButtonControl *)pControl)->SetLabel(g_localizeStrings.Get(pSetting->GetLabel()));
     pControl->SetWidth(width);
     pSettingControl = new CButtonSettingControl((CGUIButtonControl *)pControl, iControlID, pSetting);
