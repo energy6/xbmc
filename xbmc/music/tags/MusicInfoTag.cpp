@@ -20,6 +20,7 @@
 
 #include "MusicInfoTag.h"
 #include "music/Album.h"
+#include "music/Artist.h"
 #include "utils/StringUtils.h"
 #include "settings/AdvancedSettings.h"
 #include "utils/Variant.h"
@@ -504,6 +505,16 @@ void CMusicInfoTag::SetReplayGainAlbumPeak(float albumPeak)
   m_iHasGainInfo |= REPLAY_GAIN_HAS_ALBUM_PEAK;
 }
 
+void CMusicInfoTag::SetArtist(const CArtist& artist)
+{
+  SetArtist(artist.strArtist);
+  SetAlbumArtist(artist.strArtist);
+  SetGenre(artist.genre);
+  m_iDbId = artist.idArtist;
+  m_type = "artist";
+  m_bLoaded = true;
+}
+
 void CMusicInfoTag::SetAlbum(const CAlbum& album)
 {
   SetArtist(album.artist);
@@ -560,6 +571,7 @@ void CMusicInfoTag::Serialize(CVariant& value) const
     value["artist"] = m_artist[0];
   else
     value["artist"] = m_artist;
+  value["displayartist"] = StringUtils::Join(m_artist, g_advancedSettings.m_musicItemSeparator);
   value["album"] = m_strAlbum;
   value["albumartist"] = m_albumArtist;
   value["genre"] = m_genre;
